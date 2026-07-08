@@ -13,14 +13,15 @@ import kotlinx.coroutines.flow.map
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
 data class AppSettings(
-    val asrApiKey: String = "YOUR_TOKEN_PLAN_API_KEY",
+    val asrApiKey: String = "REDACTED_KEY",
     val asrBaseUrl: String = "https://token-plan-cn.xiaomimimo.com/v1",
-    val asrModel: String = "mimo-v2.5",
+    val asrModel: String = "fun-asr-realtime-2026-02-28",
     val translateApiKey: String = "YOUR_TOKEN_PLAN_API_KEY",
     val translateBaseUrl: String = "https://token-plan-cn.xiaomimimo.com/v1",
     val translateModel: String = "mimo-v2.5-pro",
     val chunkSeconds: Int = 8,
-    val asrLanguage: String = "en"
+    val asrLanguage: String = "en",
+    val asrMode: String = "dashscope"
 )
 
 class SettingsRepository(private val context: Context) {
@@ -34,6 +35,7 @@ class SettingsRepository(private val context: Context) {
         val TRANSLATE_MODEL = stringPreferencesKey("translate_model")
         val CHUNK_SECONDS = intPreferencesKey("chunk_seconds")
         val ASR_LANGUAGE = stringPreferencesKey("asr_language")
+        val ASR_MODE = stringPreferencesKey("asr_mode")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { prefs ->
@@ -45,7 +47,8 @@ class SettingsRepository(private val context: Context) {
             translateBaseUrl = prefs[TRANSLATE_BASE_URL] ?: "https://token-plan-cn.xiaomimimo.com/v1",
             translateModel = prefs[TRANSLATE_MODEL] ?: "mimo-v2.5-pro",
             chunkSeconds = prefs[CHUNK_SECONDS] ?: 8,
-            asrLanguage = prefs[ASR_LANGUAGE] ?: "en"
+            asrLanguage = prefs[ASR_LANGUAGE] ?: "en",
+            asrMode = prefs[ASR_MODE] ?: "dashscope"
         )
     }
 
@@ -59,7 +62,8 @@ class SettingsRepository(private val context: Context) {
                 translateBaseUrl = prefs[TRANSLATE_BASE_URL] ?: "https://token-plan-cn.xiaomimimo.com/v1",
                 translateModel = prefs[TRANSLATE_MODEL] ?: "mimo-v2.5-pro",
                 chunkSeconds = prefs[CHUNK_SECONDS] ?: 8,
-                asrLanguage = prefs[ASR_LANGUAGE] ?: "en"
+                asrLanguage = prefs[ASR_LANGUAGE] ?: "en",
+                asrMode = prefs[ASR_MODE] ?: "dashscope"
             )
             val updated = block(current)
             prefs[ASR_API_KEY] = updated.asrApiKey
@@ -70,6 +74,7 @@ class SettingsRepository(private val context: Context) {
             prefs[TRANSLATE_MODEL] = updated.translateModel
             prefs[CHUNK_SECONDS] = updated.chunkSeconds
             prefs[ASR_LANGUAGE] = updated.asrLanguage
+            prefs[ASR_MODE] = updated.asrMode
         }
     }
 }

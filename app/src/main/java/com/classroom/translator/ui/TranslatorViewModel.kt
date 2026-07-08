@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.classroom.translator.api.OpenAiApi
 import com.classroom.translator.audio.AudioRecorder
 import com.classroom.translator.audio.WavEncoder
+import com.classroom.translator.audio.DashScopeAsrStream
 import com.classroom.translator.audio.AudioConverter
 import com.classroom.translator.data.AppSettings
 import com.classroom.translator.data.SettingsRepository
@@ -57,6 +58,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
     private val settingsRepo = SettingsRepository(app)
     private val audioRecorder = AudioRecorder(app)
     private val api = OpenAiApi()
+    private var dashScopeStream: DashScopeAsrStream? = null
     private val sessionManager = SessionManager(app)
 
     private var sessionStartTime: String = ""
@@ -93,12 +95,15 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         audioRecorder.start()
-        _state.value = _state.value.copy(
-            isRecording = true,
-            status = "正在听...",
-            error = null
-        )
+        _state.value = _state.value.copy(isRecording = true, status = "正在听...", error = null)
 
+        // DashScope streaming mode
+        if (_state.value.settings.asrMode == "dashscope") {
+            startDashScopeStreaming()
+            return
+        }
+
+        // MIMO chunked mode (fallback)
         // Start the recording + processing loop
         kotlinx.coroutines.GlobalScope.launch(Dispatchers.Default) {
             try {
@@ -248,7 +253,55 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private fun startDashScopeStreaming() {
+        val settings = _state.value.settings
+        Log.i(TAG, "Starting DashScope streaming ASR")
+
+        dashScopeStream = DashScopeAsrStream(
+            apiKey = settings.asrApiKey,
+            model = "fun-asr-realtime-2026-02-28",
+            onResult = { text, isFinal ->
+                if (text.isBlank()) return@DashScopeAsrStream
+                Log.i(TAG, "DashScope result: $text (final=$isFinal)")
+                if (isFinal) {
+                    // Final sentence - translate immediately
+                    viewModelScope.launch(Dispatchers.Default) {
+                        val chinese = try {
+                            api.translate(baseUrl=settings.translateBaseUrl, apiKey=settings.translateApiKey, model=settings.translateModel, text=text)
+                        } catch (e: Exception) { "[翻译失败: ${e.message}]" }
+                        val entry = TranslationEntry(english = text, chinese = chinese)
+                        _state.value = _state.value.copy(entries = _state.value.entries + entry)
+                        autoSave(entry)
+                    }
+                } else {
+                    // Intermediate result - show as preview
+                    _state.value = _state.value.copy(status = "识别中: $text")
+                }
+            },
+            onError = { error ->
+                Log.e(TAG, "DashScope error: $error")
+                _state.value = _state.value.copy(error = error)
+            },
+            onConnected = {
+                Log.i(TAG, "DashScope connected, streaming audio...")
+                // Start streaming audio from AudioRecorder
+                viewModelScope.launch(Dispatchers.IO) {
+                    while (_state.value.isRecording && dashScopeStream?.isActive() == true) {
+                        val pcmData = audioRecorder.flush()
+                        if (pcmData != null && pcmData.isNotEmpty()) {
+                            dashScopeStream?.sendAudio(pcmData)
+                        }
+                        delay(100)  // Send every 100ms
+                    }
+                }
+            }
+        )
+        dashScopeStream?.start()
+    }
+
     private fun stopRecording() {
+        dashScopeStream?.stop()
+        dashScopeStream = null
         val audioPath = audioRecorder.getAudioFilePath()
         audioRecorder.stop()
         _state.value = _state.value.copy(

@@ -136,6 +136,32 @@ fun SettingsScreen(
                         }
                     }
 
+                    // ASR Mode selector
+                    var modeExpanded by remember { mutableStateOf(false) }
+                    val modes = listOf("dashscope" to "DashScope 流式 (推荐)", "mimo" to "MIMO 分段")
+                    ExposedDropdownMenuBox(
+                        expanded = modeExpanded,
+                        onExpandedChange = { modeExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = modes.find { it.first == settings.asrMode }?.second ?: settings.asrMode,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("ASR模式") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(modeExpanded) },
+                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+                            colors = textFieldColors()
+                        )
+                        ExposedDropdownMenu(expanded = modeExpanded, onDismissRequest = { modeExpanded = false }) {
+                            modes.forEach { (code, name) ->
+                                DropdownMenuItem(
+                                    text = { Text(name) },
+                                    onClick = { viewModel.updateSettings { s -> s.copy(asrMode = code) }; modeExpanded = false }
+                                )
+                            }
+                        }
+                    }
+
                     // Language dropdown
                     var langExpanded by remember { mutableStateOf(false) }
                     val languages = listOf("en" to "英语（English）", "zh" to "中文", "auto" to "自动检测")
