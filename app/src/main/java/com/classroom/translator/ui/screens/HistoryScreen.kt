@@ -38,6 +38,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import android.media.MediaPlayer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,6 +59,7 @@ import com.classroom.translator.data.TranslationSession
 import com.classroom.translator.ui.theme.Blue500
 import com.classroom.translator.ui.theme.DarkOnSurfaceVariant
 import com.classroom.translator.ui.theme.DarkSurface
+import com.classroom.translator.ui.theme.Red500
 import com.classroom.translator.ui.theme.DarkSurfaceVariant
 import com.classroom.translator.ui.theme.Green500
 
@@ -276,9 +278,40 @@ fun SessionDetailScreen(
             Column(
                 modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp)
             ) {
-                // Audio info
+                // Audio playback
                 if (s.audioPath.isNotBlank()) {
-                    Text("录音: ${s.audioPath.substringAfterLast("/")}", style = MaterialTheme.typography.labelSmall, color = DarkOnSurfaceVariant)
+                    var isPlaying by remember { mutableStateOf(false) }
+                    var player by remember { mutableStateOf<MediaPlayer?>(null) }
+                    val audioFile = java.io.File(s.audioPath)
+                    if (audioFile.exists()) {
+                        val sizeKB = audioFile.length() / 1024
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = {
+                                if (isPlaying) {
+                                    player?.stop()
+                                    player?.release()
+                                    player = null
+                                    isPlaying = false
+                                } else {
+                                    try {
+                                        player = MediaPlayer().apply {
+                                            setDataSource(s.audioPath)
+                                            prepare()
+                                            start()
+                                            setOnCompletionListener { isPlaying = false }
+                                        }
+                                        isPlaying = true
+                                    } catch (e: Exception) { android.util.Log.e("History", "Play failed", e) }
+                                }
+                            }) {
+                                Text(if (isPlaying) "■ 停止播放" else "▶ 播放录音", color = Blue500)
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Text("${sizeKB}KB", style = MaterialTheme.typography.labelSmall, color = DarkOnSurfaceVariant)
+                        }
+                    } else {
+                        Text("录音文件不存在: ${s.audioPath.substringAfterLast("/")}", style = MaterialTheme.typography.labelSmall, color = Red500)
+                    }
                     Spacer(Modifier.height(8.dp))
                 }
                 Text("${s.startTime} - ${s.endTime}  共${s.entries.size}段", style = MaterialTheme.typography.bodyMedium, color = DarkOnSurfaceVariant)
