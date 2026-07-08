@@ -36,6 +36,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Slider
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import android.media.MediaPlayer
@@ -278,40 +279,76 @@ fun SessionDetailScreen(
             Column(
                 modifier = Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp)
             ) {
-                // Audio playback
+                // Audio player
                 if (s.audioPath.isNotBlank()) {
-                    var isPlaying by remember { mutableStateOf(false) }
-                    var player by remember { mutableStateOf<MediaPlayer?>(null) }
                     val audioFile = java.io.File(s.audioPath)
                     if (audioFile.exists()) {
+                        var isPlaying by remember { mutableStateOf(false) }
+                        var player by remember { mutableStateOf<MediaPlayer?>(null) }
+                        var currentPosition by remember { mutableStateOf(0) }
+                        var totalDuration by remember { mutableStateOf(0) }
+                        var isSeeking by remember { mutableStateOf(false) }
                         val sizeKB = audioFile.length() / 1024
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(onClick = {
-                                if (isPlaying) {
-                                    player?.stop()
-                                    player?.release()
-                                    player = null
-                                    isPlaying = false
-                                } else {
-                                    try {
-                                        player = MediaPlayer().apply {
-                                            setDataSource(s.audioPath)
-                                            prepare()
-                                            start()
-                                            setOnCompletionListener { isPlaying = false }
-                                        }
-                                        isPlaying = true
-                                    } catch (e: Exception) { android.util.Log.e("History", "Play failed", e) }
+                        LaunchedEffect(isPlaying) {
+                            while (isPlaying) {
+                                kotlinx.coroutines.delay(200)
+                                if (!isSeeking && player != null) {
+                                    try { currentPosition = player!!.currentPosition } catch (_: Exception) {}
                                 }
-                            }) {
-                                Text(if (isPlaying) "■ 停止播放" else "▶ 播放录音", color = Blue500)
                             }
-                            Spacer(Modifier.width(8.dp))
-                            Text("${sizeKB}KB", style = MaterialTheme.typography.labelSmall, color = DarkOnSurfaceVariant)
                         }
-                    } else {
-                        Text("录音文件不存在: ${s.audioPath.substringAfterLast("/")}", style = MaterialTheme.typography.labelSmall, color = Red500)
-                    }
+                        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant)) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("Recording ${sizeKB}KB", style = MaterialTheme.typography.labelSmall, color = DarkOnSurfaceVariant)
+                                Spacer(Modifier.height(4.dp))
+                                Slider(
+                                    value = currentPosition.toFloat(),
+                                    onValueChange = { isSeeking = true; currentPosition = it.toInt() },
+                                    onValueChangeFinished = { player?.seekTo(currentPosition); isSeeking = false },
+                                    valueRange = 0f..totalDuration.toFloat().coerceAtLeast(1f),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Text("%d:%02d".format(currentPosition / 1000 / 60, currentPosition / 1000 % 60), style = MaterialTheme.typography.labelSmall, color = DarkOnSurfaceVariant)
+                                    Text("%d:%02d".format(totalDuration / 1000 / 60, totalDuration / 1000 % 60), style = MaterialTheme.typography.labelSmall, color = DarkOnSurfaceVariant)
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
+                                    TextButton(onClick = {
+                                        if (isPlaying) { player?.pause(); isPlaying = false }
+                                        else {
+                                            if (player == null) {
+                                                try {
+                                                    player = MediaPlayer().apply {
+                                                        setDataSource(s.audioPath); prepare(); totalDuration = duration; start()
+                                                        setOnCompletionListener { isPlaying = false; currentPosition = 0 }
+                                                    }; isPlaying = true
+                                                } catch (e: Exception) { android.util.Log.e("History", "Play failed", e) }
+                                            } else { player?.start(); isPlaying = true }
+                                        }
+                                    }) { Text(if (isPlaying) "Pause" else "Play", color = Blue500) }
+                                    Spacer(Modifier.width(16.dp))
+                                    TextButton(onClick = {
+                                        player?.stop(); player?.release(); player = null; isPlaying = false; currentPosition = 0
+                                    }) { Text("Stop", color = DarkOnSurfaceVariant) }
+                                    Spacer(Modifier.width(16.dp))
+                                    TextButton(onClick = {
+                                        try {
+                                            val exportDir = java.io.File(context.getExternalFilesDir(null), "exports"); exportDir.mkdirs()
+                                            val exportFile = java.io.File(exportDir, "recording_${s.date}.wav")
+                                            audioFile.copyTo(exportFile, overwrite = true)
+                                            val uri = androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".fileprovider", exportFile)
+                                            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                type = "audio/wav"; putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            }
+                                            context.startActivity(android.content.Intent.createChooser(intent, "Export Recording"))
+                                        } catch (e: Exception) { android.util.Log.e("History", "Export failed", e) }
+                                    }) { Text("Export Audio", color = DarkOnSurfaceVariant) }
+                                }
+                            }
+                        }
+                    } else { Text("Recording not found", style = MaterialTheme.typography.labelSmall, color = Red500) }
                     Spacer(Modifier.height(8.dp))
                 }
                 Text("${s.startTime} - ${s.endTime}  共${s.entries.size}段", style = MaterialTheme.typography.bodyMedium, color = DarkOnSurfaceVariant)
