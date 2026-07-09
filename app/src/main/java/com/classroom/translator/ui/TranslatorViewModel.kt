@@ -286,7 +286,12 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 Log.i(TAG, "DashScope connected, streaming audio...")
                 // Start streaming audio from AudioRecorder
                 viewModelScope.launch(Dispatchers.IO) {
-                    while (_state.value.isRecording && dashScopeStream?.isActive() == true) {
+                    // Wait for DashScope task to start
+                        while (_state.value.isRecording && dashScopeStream != null && !dashScopeStream!!.isActive()) {
+                            delay(50)
+                        }
+                        Log.i(TAG, "DashScope task started, sending audio...")
+                        while (_state.value.isRecording && dashScopeStream?.isActive() == true) {
                         val pcmData = audioRecorder.flush()
                         if (pcmData != null && pcmData.isNotEmpty()) {
                             dashScopeStream?.sendAudio(pcmData)

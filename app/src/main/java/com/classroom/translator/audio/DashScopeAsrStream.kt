@@ -98,8 +98,10 @@ class DashScopeAsrStream(
                 put("input", JSONObject())  // empty input for streaming
             })
         }
-        Log.d(TAG, "Sending run-task: $taskId")
-        webSocket?.send(msg.toString())
+        Log.i(TAG, ">>> Sending run-task: $taskId, model=$model, format=pcm, rate=$sampleRate")
+        val json = msg.toString()
+        Log.d(TAG, ">>> run-task JSON: ${json.take(200)}")
+        webSocket?.send(json)
     }
 
     private fun handleMessage(text: String) {
@@ -164,7 +166,7 @@ class DashScopeAsrStream(
         webSocket?.send(bs)
         sendCount++
         
-        if (sendCount <= 5 || sendCount % 20 == 0) {
+        if (sendCount <= 10 || sendCount % 20 == 0) {
             Log.d(TAG, "Audio #$sendCount: ${pcmData.size}B, RMS=${rms.toInt()}, voice=$hasVoice")
         }
         if (sendCount == 1) {
@@ -187,7 +189,9 @@ class DashScopeAsrStream(
                 put("input", JSONObject())
             })
         }
-        webSocket?.send(msg.toString())
+        val json = msg.toString()
+        Log.d(TAG, ">>> run-task JSON: ${json.take(200)}")
+        webSocket?.send(json)
         // Close after a short delay
         Thread {
             Thread.sleep(1000)
