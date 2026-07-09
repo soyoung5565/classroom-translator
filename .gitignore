@@ -5,3 +5,6 @@ local.properties
 *.iml
 .idea/
 .DS_Store
+app-debug.apk
+test.wav
+.env
