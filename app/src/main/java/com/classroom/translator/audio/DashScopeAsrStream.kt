@@ -145,28 +145,32 @@ class DashScopeAsrStream(
      */
     fun sendAudio(pcmData: ByteArray) {
         if (!isConnected || !isStarted) return
-        // Check if audio has actual content (not all zeros)
-        val hasContent = pcmData.any { it != 0.toByte() }
-        if (!hasContent && sendCount > 10) return  // skip silence after first few frames
         
-        // Send as JSON with base64-encoded audio
-        val b64 = android.util.Base64.encodeToString(pcmData, android.util.Base64.NO_WRAP)
-        val msg = JSONObject().apply {
-            put("header", JSONObject().apply {
-                put("action", "continue-task")
-                put("task_id", taskId)
-                put("streaming", "duplex")
-            })
-            put("payload", JSONObject().apply {
-                put("input", JSONObject().apply {
-                    put("audio", b64)
-                })
-            })
+        // Calculate RMS to verify audio has content
+        var sum = 0L
+        for (i in pcmData.indices step 2) {
+            if (i + 1 < pcmData.size) {
+                val lo = pcmData[i].toInt() and 0xFF
+                val hi = pcmData[i + 1].toInt()
+                val sample = lo or (hi shl 8)
+                sum += sample.toLong() * sample.toLong()
+            }
         }
-        webSocket?.send(msg.toString())
+        val rms = kotlin.math.sqrt(sum.toDouble() / (pcmData.size / 2))
+        val hasVoice = rms > 100  // threshold for non-silence
+        
+        // Send as raw binary WebSocket frame (official DashScope protocol)
+        val bs = okio.ByteString.of(*pcmData)
+        webSocket?.send(bs)
         sendCount++
-        if (sendCount <= 3 || sendCount % 50 == 0) {
-            Log.d(TAG, "Sent audio frame #$sendCount: ${pcmData.size} bytes, hasContent=$hasContent")
+        
+        if (sendCount <= 5 || sendCount % 20 == 0) {
+            Log.d(TAG, "Audio #$sendCount: ${pcmData.size}B, RMS=${rms.toInt()}, voice=$hasVoice")
+        }
+        if (sendCount == 1) {
+            // Log first 16 bytes for debugging
+            val hex = pcmData.take(16).joinToString(" ") { b -> String.format("%02x", b.toInt() and 0xff) }
+            Log.d(TAG, "First 16 bytes: $hex")
         }
     }
 
