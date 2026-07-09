@@ -2,8 +2,6 @@ package com.classroom.translator.audio
 
 import android.util.Log
 import okhttp3.*
-import okio.ByteString
-import okio.ByteString.Companion.toByteString
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
@@ -36,9 +34,11 @@ class DashScopeAsrStream(
     private var taskId: String = ""
     @Volatile private var isConnected = false
     @Volatile private var isStarted = false
+    private var sendCount = 0
 
     fun start() {
         if (isConnected) return
+        sendCount = 0
 
         val request = Request.Builder()
             .url(WS_URL)
@@ -145,8 +145,29 @@ class DashScopeAsrStream(
      */
     fun sendAudio(pcmData: ByteArray) {
         if (!isConnected || !isStarted) return
-        // Send as binary WebSocket frame
-        webSocket?.send(pcmData.toByteString(0, pcmData.size))
+        // Check if audio has actual content (not all zeros)
+        val hasContent = pcmData.any { it != 0.toByte() }
+        if (!hasContent && sendCount > 10) return  // skip silence after first few frames
+        
+        // Send as JSON with base64-encoded audio
+        val b64 = android.util.Base64.encodeToString(pcmData, android.util.Base64.NO_WRAP)
+        val msg = JSONObject().apply {
+            put("header", JSONObject().apply {
+                put("action", "continue-task")
+                put("task_id", taskId)
+                put("streaming", "duplex")
+            })
+            put("payload", JSONObject().apply {
+                put("input", JSONObject().apply {
+                    put("audio", b64)
+                })
+            })
+        }
+        webSocket?.send(msg.toString())
+        sendCount++
+        if (sendCount <= 3 || sendCount % 50 == 0) {
+            Log.d(TAG, "Sent audio frame #$sendCount: ${pcmData.size} bytes, hasContent=$hasContent")
+        }
     }
 
     fun stop() {
