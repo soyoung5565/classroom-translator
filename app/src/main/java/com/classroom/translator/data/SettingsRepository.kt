@@ -13,12 +13,14 @@ import kotlinx.coroutines.flow.map
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
 data class AppSettings(
+    // ASR: 保留百炼 Fun-ASR Realtime (用户指定, minimax 套餐不含 ASR)
     val asrApiKey: String = "REDACTED_KEY",
-    val asrBaseUrl: String = "https://token-plan-cn.xiaomimimo.com/v1",
+    val asrBaseUrl: String = "https://dashscope.aliyuncs.com/compatible-mode/v1",
     val asrModel: String = "fun-asr-realtime-2026-02-28",
-    val translateApiKey: String = "YOUR_TOKEN_PLAN_API_KEY",
-    val translateBaseUrl: String = "https://token-plan-cn.xiaomimimo.com/v1",
-    val translateModel: String = "mimo-v2.5-pro",
+    // LLM 翻译: 切到 minimax M3
+    val translateApiKey: String = "sk-cp-zibpVL97JE9eNAoKwwizTx7lm15Pq4I792nUDkVeJ_PtPKZ_XbuD2tJkXIcZJ9RW_kEuXEuhVlhrkR2i8A1YS-gZ_BMKrLOXOSvMKL40s615FRqqXTWT_4g",
+    val translateBaseUrl: String = "https://api.minimaxi.com/v1",
+    val translateModel: String = "MiniMax-M3",
     val chunkSeconds: Int = 8,
     val asrLanguage: String = "en",
     val asrMode: String = "dashscope"
@@ -40,12 +42,12 @@ class SettingsRepository(private val context: Context) {
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { prefs ->
         AppSettings(
-            asrApiKey = prefs[ASR_API_KEY] ?: "YOUR_TOKEN_PLAN_API_KEY",
-            asrBaseUrl = prefs[ASR_BASE_URL] ?: "https://token-plan-cn.xiaomimimo.com/v1",
-            asrModel = prefs[ASR_MODEL] ?: "mimo-v2.5",
-            translateApiKey = prefs[TRANSLATE_API_KEY] ?: "YOUR_TOKEN_PLAN_API_KEY",
-            translateBaseUrl = prefs[TRANSLATE_BASE_URL] ?: "https://token-plan-cn.xiaomimimo.com/v1",
-            translateModel = prefs[TRANSLATE_MODEL] ?: "mimo-v2.5-pro",
+            asrApiKey = prefs[ASR_API_KEY] ?: "REDACTED_KEY",
+            asrBaseUrl = prefs[ASR_BASE_URL] ?: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            asrModel = prefs[ASR_MODEL] ?: "fun-asr-realtime-2026-02-28",
+            translateApiKey = prefs[TRANSLATE_API_KEY] ?: "sk-cp-zibpVL97JE9eNAoKwwizTx7lm15Pq4I792nUDkVeJ_PtPKZ_XbuD2tJkXIcZJ9RW_kEuXEuhVlhrkR2i8A1YS-gZ_BMKrLOXOSvMKL40s615FRqqXTWT_4g",
+            translateBaseUrl = prefs[TRANSLATE_BASE_URL] ?: "https://api.minimaxi.com/v1",
+            translateModel = prefs[TRANSLATE_MODEL] ?: "MiniMax-M3",
             chunkSeconds = prefs[CHUNK_SECONDS] ?: 8,
             asrLanguage = prefs[ASR_LANGUAGE] ?: "en",
             asrMode = prefs[ASR_MODE] ?: "dashscope"
@@ -55,12 +57,12 @@ class SettingsRepository(private val context: Context) {
     suspend fun update(block: (AppSettings) -> AppSettings) {
         context.dataStore.edit { prefs ->
             val current = AppSettings(
-                asrApiKey = prefs[ASR_API_KEY] ?: "YOUR_TOKEN_PLAN_API_KEY",
-                asrBaseUrl = prefs[ASR_BASE_URL] ?: "https://token-plan-cn.xiaomimimo.com/v1",
-                asrModel = prefs[ASR_MODEL] ?: "mimo-v2.5",
-                translateApiKey = prefs[TRANSLATE_API_KEY] ?: "YOUR_TOKEN_PLAN_API_KEY",
-                translateBaseUrl = prefs[TRANSLATE_BASE_URL] ?: "https://token-plan-cn.xiaomimimo.com/v1",
-                translateModel = prefs[TRANSLATE_MODEL] ?: "mimo-v2.5-pro",
+                asrApiKey = prefs[ASR_API_KEY] ?: "REDACTED_KEY",
+                asrBaseUrl = prefs[ASR_BASE_URL] ?: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                asrModel = prefs[ASR_MODEL] ?: "fun-asr-realtime-2026-02-28",
+                translateApiKey = prefs[TRANSLATE_API_KEY] ?: "sk-cp-zibpVL97JE9eNAoKwwizTx7lm15Pq4I792nUDkVeJ_PtPKZ_XbuD2tJkXIcZJ9RW_kEuXEuhVlhrkR2i8A1YS-gZ_BMKrLOXOSvMKL40s615FRqqXTWT_4g",
+                translateBaseUrl = prefs[TRANSLATE_BASE_URL] ?: "https://api.minimaxi.com/v1",
+                translateModel = prefs[TRANSLATE_MODEL] ?: "MiniMax-M3",
                 chunkSeconds = prefs[CHUNK_SECONDS] ?: 8,
                 asrLanguage = prefs[ASR_LANGUAGE] ?: "en",
                 asrMode = prefs[ASR_MODE] ?: "dashscope"
