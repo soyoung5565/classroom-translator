@@ -118,11 +118,12 @@ class DashScopeAsrStream(
                 "result-generated" -> {
                     val payload = json.optJSONObject("payload")
                     val output = payload?.optJSONObject("output")
-                    val sentence = output?.optString("sentence", "")
-                    val sentenceEnd = output?.optBoolean("sentence_end", false) ?: false
-                    if (!sentence.isNullOrBlank()) {
-                        Log.d(TAG, "Result: $sentence (final=$sentenceEnd)")
-                        onResult(sentence, sentenceEnd)
+                    val sentenceObj = output?.optJSONObject("sentence")
+                    val text = sentenceObj?.optString("text", "") ?: ""
+                    val sentenceEnd = sentenceObj?.optBoolean("sentence_end", false) ?: false
+                    if (text.isNotBlank()) {
+                        Log.d(TAG, "Result: $text (final=$sentenceEnd)")
+                        onResult(text, sentenceEnd)
                     }
                 }
                 "task-finished" -> {
