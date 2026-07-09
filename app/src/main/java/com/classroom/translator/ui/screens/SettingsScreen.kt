@@ -102,7 +102,7 @@ fun SettingsScreen(
 
                     // Model dropdown
                     var asrExpanded by remember { mutableStateOf(false) }
-                    val asrModels = listOf("mimo-v2.5", "mimo-v2.5-asr", "mimo-v2-omni")
+                    val asrModels = listOf("fun-asr-realtime-2026-02-28", "fun-asr-realtime")
                     ExposedDropdownMenuBox(
                         expanded = asrExpanded,
                         onExpandedChange = { asrExpanded = it }
@@ -121,9 +121,9 @@ fun SettingsScreen(
                                 DropdownMenuItem(
                                     text = {
                                         Text(when(model) {
-                                            "mimo-v2.5" -> "mimo-v2.5（推荐）"
-                                            "mimo-v2.5-asr" -> "mimo-v2.5-asr（快速，压缩）"
-                                            "mimo-v2-omni" -> "mimo-v2-omni（最准确）"
+                                            "mimo-v2.5" -> "fun-asr-realtime-2026-02-28（最新）"
+                                            "mimo-v2.5-asr" -> "fun-asr-realtime（稳定）"
+                                            "mimo-v2-omni" -> "fun-asr-realtime-2026-02-28（最新）"
                                             else -> model
                                         })
                                     },
@@ -218,11 +218,8 @@ fun SettingsScreen(
 
                     var transExpanded by remember { mutableStateOf(false) }
                     val transModels = listOf(
-                        "deepseek-chat" to "DeepSeek",
-                        "mimo-v2.5" to "MIMO v2.5",
-                        "mimo-v2.5-pro" to "MIMO v2.5 Pro",
-                        "qwen-plus" to "通义千问 Plus",
-                        "qwen-turbo" to "通义千问 Turbo"
+                        "MiniMax-M3" to "MiniMax-M3",
+                        "MiniMax-M2.7-highspeed" to "MiniMax-M2.7 Highspeed"
                     )
                     ExposedDropdownMenuBox(
                         expanded = transExpanded,
@@ -289,7 +286,7 @@ fun SettingsScreen(
             SectionHeader("快速预设")
             Spacer(Modifier.height(8.dp))
 
-            PresetButton("MIMO 识别 + DeepSeek 翻译") {
+            PresetButton("DashScope + MiniMax-M3") {
                 viewModel.updateSettings { s -> s.copy(
                     asrBaseUrl = "https://token-plan-cn.xiaomimimo.com/v1",
                     asrModel = "mimo-v2.5",
@@ -297,7 +294,7 @@ fun SettingsScreen(
                     translateModel = "deepseek-chat"
                 )}
             }
-            PresetButton("MIMO 识别 + MIMO 翻译") {
+            PresetButton("DashScope + MiniMax Highspeed") {
                 viewModel.updateSettings { s -> s.copy(
                     asrBaseUrl = "https://token-plan-cn.xiaomimimo.com/v1",
                     asrModel = "mimo-v2.5",
@@ -305,7 +302,7 @@ fun SettingsScreen(
                     translateModel = "mimo-v2.5-pro"
                 )}
             }
-            PresetButton("MIMO 识别 + 通义千问翻译") {
+            PresetButton("DashScope + DeepSeek") {
                 viewModel.updateSettings { s -> s.copy(
                     asrBaseUrl = "https://token-plan-cn.xiaomimimo.com/v1",
                     asrModel = "mimo-v2.5",
