@@ -265,7 +265,7 @@ private fun StatusBar(state: TranslatorUiState) {
             }
             val asrName = state.settings.asrModel.let {
                 if (it.contains("omni")) "MIMO-Omni"
-                else if (it.contains("asr")) "MIMO-ASR"
+                else if (it.contains("fun-asr") || it.contains("dashscope")) "DashScope" else if (it.contains("asr")) "ASR"
                 else "MIMO"
             }
             Text(

@@ -251,35 +251,6 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(20.dp))
 
-            // Recording Section
-            SectionHeader("录音")
-            Spacer(Modifier.height(8.dp))
-
-            Card(
-                colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        "分段间隔：${settings.chunkSeconds}秒",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = DarkOnSurfaceVariant
-                    )
-                    Slider(
-                        value = settings.chunkSeconds.toFloat(),
-                        onValueChange = { viewModel.updateSettings { s -> s.copy(chunkSeconds = it.toInt()) } },
-                        valueRange = 3f..20f,
-                        steps = 16,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Text(
-                        "越短响应越快，越长识别越准",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = DarkOnSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                }
-            }
-
             Spacer(Modifier.height(24.dp))
 
             // Presets
