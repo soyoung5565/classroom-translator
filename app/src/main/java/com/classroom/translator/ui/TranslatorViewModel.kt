@@ -59,6 +59,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
     private val audioRecorder = AudioRecorder(app)
     private val api = OpenAiApi()
     private var dashScopeStream: DashScopeAsrStream? = null
+    private var lastTranslatedText = ""
     private val sessionManager = SessionManager(app)
 
     private var sessionStartTime: String = ""
@@ -262,20 +263,17 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
             model = "fun-asr-realtime-2026-02-28",
             onResult = { text, isFinal ->
                 if (text.isBlank()) return@DashScopeAsrStream
+                if (text == lastTranslatedText) return@DashScopeAsrStream
+                lastTranslatedText = text
                 Log.i(TAG, "DashScope result: $text (final=$isFinal)")
-                if (isFinal) {
-                    // Final sentence - translate immediately
-                    viewModelScope.launch(Dispatchers.Default) {
-                        val chinese = try {
-                            api.translate(baseUrl=settings.translateBaseUrl, apiKey=settings.translateApiKey, model=settings.translateModel, text=text)
-                        } catch (e: Exception) { "[翻译失败: ${e.message}]" }
-                        val entry = TranslationEntry(english = text, chinese = chinese)
-                        _state.value = _state.value.copy(entries = _state.value.entries + entry)
-                        autoSave(entry)
-                    }
-                } else {
-                    // Intermediate result - show as preview
-                    _state.value = _state.value.copy(status = "识别中: $text")
+                viewModelScope.launch(Dispatchers.Default) {
+                    val chinese = try {
+                        api.translate(baseUrl=settings.translateBaseUrl, apiKey=settings.translateApiKey, model=settings.translateModel, text=text)
+                    } catch (e: Exception) { "[翻译失败: ${e.message}]" }
+                    val entry = TranslationEntry(english = text, chinese = chinese)
+                    _state.value = _state.value.copy(entries = _state.value.entries + entry)
+                    autoSave(entry)
+                    if (isFinal) finishSession()
                 }
             },
             onError = { error ->
@@ -314,6 +312,16 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
             audioLevel = 0f,
             status = "已停止"
         )
+    }
+
+    fun saveCurrentSession() {
+        // Public method to save current session (called by BackHandler)
+        viewModelScope.launch {
+            if (_state.value.isRecording) {
+                stopRecording()
+            }
+            finishSession()
+        }
     }
 
     fun startNewSession() {

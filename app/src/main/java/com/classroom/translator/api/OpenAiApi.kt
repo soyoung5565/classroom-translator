@@ -103,6 +103,15 @@ class OpenAiApi {
     /**
      * Translate text using chat completions API.
      */
+    private fun stripThinking(text: String): String {
+        var result = text
+        // Strip <think>...</think>
+        result = result.replace(Regex("<think>.*?</think>", RegexOption.DOT_MATCHES_ALL), "")
+        result = result.replace(Regex("<answer>(.*?)</answer>", RegexOption.DOT_MATCHES_ALL)) { it.groupValues[1] }
+        result = result.replace(Regex("<think>.*", RegexOption.DOT_MATCHES_ALL), "")
+        return result.trim()
+    }
+
     suspend fun translate(
         baseUrl: String,
         apiKey: String,
