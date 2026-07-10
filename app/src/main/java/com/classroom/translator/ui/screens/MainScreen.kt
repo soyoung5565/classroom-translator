@@ -88,12 +88,6 @@ fun MainScreen(
         }
     }
 
-    // Auto-save when leaving screen (back button or navigation)
-    androidx.activity.compose.BackHandler(enabled = state.isRecording || state.entries.isNotEmpty()) {
-        viewModel.saveCurrentSession()
-        onNavigateToHistory()
-    }
-
     // File picker for audio import
     val context = androidx.compose.ui.platform.LocalContext.current
     val filePicker = androidx.activity.compose.rememberLauncherForActivityResult(

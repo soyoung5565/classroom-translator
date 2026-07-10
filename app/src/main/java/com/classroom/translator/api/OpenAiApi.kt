@@ -16,6 +16,13 @@ import java.util.concurrent.TimeUnit
  * Works with MIMO, DeepSeek, Qwen, or any OpenAI-compatible endpoint.
  */
 class OpenAiApi {
+    private fun stripThinking(text: String): String {
+        var result = text
+        result = result.replace(Regex("<think>.*?</think>", RegexOption.DOT_MATCHES_ALL), "")
+        result = result.replace(Regex("<answer>(.*?)</answer>", RegexOption.DOT_MATCHES_ALL)) { it.groupValues[1] }
+        result = result.replace(Regex("<think>.*", RegexOption.DOT_MATCHES_ALL), "")
+        return result.trim()
+    }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -97,21 +104,12 @@ class OpenAiApi {
             .getJSONObject(0)
             .getJSONObject("message")
             .getString("content")
-            .trim()
+            .let { stripThinking(it) }
     }
 
     /**
      * Translate text using chat completions API.
      */
-    private fun stripThinking(text: String): String {
-        var result = text
-        // Strip <think>...</think>
-        result = result.replace(Regex("<think>.*?</think>", RegexOption.DOT_MATCHES_ALL), "")
-        result = result.replace(Regex("<answer>(.*?)</answer>", RegexOption.DOT_MATCHES_ALL)) { it.groupValues[1] }
-        result = result.replace(Regex("<think>.*", RegexOption.DOT_MATCHES_ALL), "")
-        return result.trim()
-    }
-
     suspend fun translate(
         baseUrl: String,
         apiKey: String,
@@ -154,7 +152,7 @@ class OpenAiApi {
             .getJSONObject(0)
             .getJSONObject("message")
             .getString("content")
-            .trim()
+            .let { stripThinking(it) }
     }
 
 
@@ -200,7 +198,7 @@ class OpenAiApi {
         val content = json.getJSONArray("choices")
             .getJSONObject(0)
             .getJSONObject("message")
-            .getString("content").trim()
+            .getString("content")
 
         try {
             val jsonStr = content.let {
