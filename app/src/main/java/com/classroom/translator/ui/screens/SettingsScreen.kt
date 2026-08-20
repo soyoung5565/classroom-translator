@@ -227,7 +227,7 @@ fun SettingsScreen(
 
                     var transExpanded by remember { mutableStateOf(false) }
                     val transModels = listOf(
-                        "deepseek-v4-flash" to "DeepSeek V4 Flash (当前)",
+                        "qwen3-1.7b" to "本地 Qwen3-1.7B (当前, 0.66s)",
                         "minimax-m3" to "MiniMax M3",
                         "kimi-k3" to "Kimi K3",
                         "glm-5.2" to "GLM 5.2",
@@ -269,14 +269,14 @@ fun SettingsScreen(
             SectionHeader("快速预设")
             Spacer(Modifier.height(8.dp))
 
-            PresetButton("本地 vLLM + opencode.go (推荐)") {
+            PresetButton("本地 vLLM + 本地翻译 (推荐)") {
                 viewModel.updateSettings { s -> s.copy(
                     asrBaseUrl = "http://127.0.0.1:8000/v1",
                     asrModel = "Qwen3-ASR",
                     asrMode = "local_vllm",
-                    translateBaseUrl = "https://opencode.ai/zen/go/v1",
+                    translateBaseUrl = "http://127.0.0.1:8002/v1",
                     translateApiKey = "REDACTED_KEY",
-                    translateModel = "deepseek-v4-flash"
+                    translateModel = "qwen3-1.7b"
                 )}
             }
             PresetButton("DashScope + MiniMax-M3") {
