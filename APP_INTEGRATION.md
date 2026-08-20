@@ -54,3 +54,32 @@ App 同时支持两种"整课"工作模式：
 - WSL 端口局域网可达性（wsl2 localhost 转发只对 Windows 本机；局域网需`netsh interface portproxy` 或 WSL mirrored，需实测）
 - 手机上行带宽：整节课 wav 可能几十 MB，上传耗时（可先用压缩/分段）
 - vLLM 同时服务流式 + 整课转录会抢显存（8G 小），需错峰
+
+
+## 五、真机验证结论（2026-08-20，Android 16 Redmi 25102RKBEC）
+
+### 手机访问本地服务的三种方式
+1. **✅ ADB reverse（USB 连接时最稳，已验证）**
+   ```
+   adb reverse tcp:8001 tcp:8001   # 手机 127.0.0.1:8001 → 电脑 127.0.0.1:8001
+   adb reverse tcp:8000 tcp:8000   # 同上，给 vLLM
+   ```
+   - 已实测：手机 `curl 127.0.0.1:8001/health` 返回 `{"engine":"vibeasr-bitnet","status":"ok"}`
+   - 手机上传音频 → `/transcribe` 返回真实转写 JSON ✅
+   - 注意：reverse 每次重插 USB 需重建；App 设置里地址写 `http://127.0.0.1:8001`
+2. `192.168.1.249:8001`（Wi-Fi 直连）：需 WSL mirrored 或 netsh portproxy（未配置）
+3. 内网穿透（frp/tailscale）：校园网/出门场景，未做
+
+### ⚠️ WSL 服务持久化（重要坑）
+- `wsl.exe bash -lc 'nohup ... &'` 启动的进程在 wsl 命令退出后**可能被回收**（服务会消失）
+- 正确姿势：`/opt/start_vibe_http.sh` 内部用 `setsid python3 ... &`，且用 `wsl -e bash /opt/start_vibe_http.sh` 方式启动
+- **一旦 WSL 重启（wsl --shutdown / 系统重启），服务全部消失**，需重新 start_vibe_http.sh + start-asr.sh
+- 若要开机常驻：Windows 计划任务跑 `wsl -e bash /opt/start_vibe_http.sh`
+
+### MuMu 模拟器
+- 已装 APK 并验证界面正常（Android 15 实例，adb 端口 16448）
+- CLI：`D:/Program Files/Netease/MuMu/nx_main/mumu-cli.exe`
+  - 查看实例：`mumu-cli.exe info --vmindex all`
+  - 启动：`mumu-cli.exe control --vmindex 2 launch`
+  - ADB 直连：`mumu-cli.exe adb --vmindex 2 --cmd "shell getprop ..."`
+- Android 16 上 `adb shell input tap` 受限（rc=255），UI 自动点击不可用
