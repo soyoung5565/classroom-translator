@@ -87,6 +87,7 @@ class OpenAiApi {
 
         val request = Request.Builder()
             .url("$baseUrl/chat/completions")
+            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0")
             .addHeader("Authorization", "Bearer $apiKey")
             .addHeader("Content-Type", "application/json")
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
@@ -135,6 +136,7 @@ class OpenAiApi {
 
         val request = Request.Builder()
             .url("$baseUrl/chat/completions")
+            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0")
             .addHeader("Authorization", "Bearer $apiKey")
             .addHeader("Content-Type", "application/json")
             .post(payload.toString().toRequestBody("application/json".toMediaType()))
@@ -185,6 +187,7 @@ class OpenAiApi {
 
         val request = Request.Builder()
             .url("$baseUrl/chat/completions")
+            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0")
             .addHeader("Authorization", "Bearer $apiKey")
             .addHeader("Content-Type", "application/json")
             .post(payload.toString().toRequestBody("application/json".toMediaType()))

@@ -103,7 +103,7 @@ fun SettingsScreen(
                     // Model dropdown
                     var asrExpanded by remember { mutableStateOf(false) }
                     val asrModels = listOf(
-                        "Qwen3-ASR-1.7B", "Qwen3-ASR-0.6B",
+                        "Qwen3-ASR",
                         "fun-asr-realtime-2026-02-28", "fun-asr-realtime"
                     )
                     ExposedDropdownMenuBox(
@@ -227,8 +227,11 @@ fun SettingsScreen(
 
                     var transExpanded by remember { mutableStateOf(false) }
                     val transModels = listOf(
-                        "MiniMax-M3" to "MiniMax-M3",
-                        "MiniMax-M2.7-highspeed" to "MiniMax-M2.7 Highspeed"
+                        "deepseek-v4-flash" to "DeepSeek V4 Flash (当前)",
+                        "minimax-m3" to "MiniMax M3",
+                        "kimi-k3" to "Kimi K3",
+                        "glm-5.2" to "GLM 5.2",
+                        "qwen3.8-max" to "Qwen3.8 Max"
                     )
                     ExposedDropdownMenuBox(
                         expanded = transExpanded,
@@ -266,6 +269,16 @@ fun SettingsScreen(
             SectionHeader("快速预设")
             Spacer(Modifier.height(8.dp))
 
+            PresetButton("本地 vLLM + opencode.go (推荐)") {
+                viewModel.updateSettings { s -> s.copy(
+                    asrBaseUrl = "http://127.0.0.1:8000/v1",
+                    asrModel = "Qwen3-ASR",
+                    asrMode = "local_vllm",
+                    translateBaseUrl = "https://opencode.ai/zen/go/v1",
+                    translateApiKey = "REDACTED_KEY",
+                    translateModel = "deepseek-v4-flash"
+                )}
+            }
             PresetButton("DashScope + MiniMax-M3") {
                 viewModel.updateSettings { s -> s.copy(
                     asrBaseUrl = "https://token-plan-cn.xiaomimimo.com/v1",
