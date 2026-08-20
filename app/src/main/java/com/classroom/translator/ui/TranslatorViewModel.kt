@@ -20,6 +20,14 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 import com.classroom.translator.data.SessionManager
 import com.classroom.translator.data.TranslationSession
 import com.classroom.translator.data.TranslationEntryData
@@ -510,6 +518,110 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+    /**
+     * 整课录音转录：上传到本地 VibeVoice HTTP 服务，逐段翻译，生成双语字幕。
+     * @param serverUrl 例 http://192.168.1.249:8001
+     */
+    fun transcribeWholeSession(
+        audioBytes: ByteArray,
+        fileName: String,
+        serverUrl: String,
+        onProgress: (String) -> Unit = {},
+        onComplete: () -> Unit = {}
+    ) {
+        val settings = _state.value.settings
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.Default) {
+            _state.value = _state.value.copy(isRecording = false)
+            _state.value = _state.value.copy(isProcessing = true, status = "上传转写中: $fileName")
+            try {
+                // 1) 转 WAV（若非 wav）
+                var wavData = audioBytes
+                if (AudioConverter.needsConversion(fileName)) {
+                    onProgress("转换音频格式...")
+                    _state.value = _state.value.copy(status = "转换音频格式...")
+                    val converted = AudioConverter.convertToWav(getApplication(), audioBytes, fileName)
+                    if (converted == null) {
+                        _state.value = _state.value.copy(isProcessing = false, status = "就绪",
+                            error = "不支持的音频格式: $fileName")
+                        return@launch
+                    }
+                    wavData = converted
+                }
+                onProgress("上传到转录服务...")
+                _state.value = _state.value.copy(status = "上传到转录服务...")
+
+                // 2) Multipart 上传到本地服务
+                val mediaType = "application/octet-stream".toMediaType()
+                val body = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("file", fileName, wavData.toRequestBody(mediaType))
+                    .build()
+                val baseUrl = serverUrl.trimEnd('/')
+                val req = Request.Builder()
+                    .url("$baseUrl/transcribe")
+                    .post(body)
+                    .build()
+                val resp = OkHttpClient.Builder()
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(600, TimeUnit.SECONDS)
+                    .writeTimeout(120, TimeUnit.SECONDS)
+                    .build()
+                    .newCall(req).execute()
+                val respBody = resp.body?.string() ?: ""
+                if (!resp.isSuccessful) {
+                    _state.value = _state.value.copy(isProcessing = false, status = "就绪",
+                        error = "转录服务错误 ${resp.code}: ${respBody.take(200)}")
+                    return@launch
+                }
+                val json = JSONObject(respBody)
+                val segments = json.getJSONArray("segments")
+                val count = segments.length()
+                if (count == 0) {
+                    _state.value = _state.value.copy(isProcessing = false, status = "就绪",
+                        error = "未识别到语音内容")
+                    return@launch
+                }
+                _state.value = _state.value.copy(status = "识别到 $count 段，开始翻译...")
+
+                // 3) 逐段翻译，加入条目（带时间戳）
+                val newEntries = mutableListOf<TranslationEntry>()
+                for (i in 0 until count) {
+                    val seg = segments.getJSONObject(i)
+                    val raw = seg.optString("Text", seg.optString("text", ""))
+                    if (raw.isBlank()) continue
+                    val start = seg.optDouble("Start", 0.0)
+                    val end = seg.optDouble("End", 0.0)
+                    val ts = "${formatTime(start)} - ${formatTime(end)}"
+                    onProgress("翻译第 ${i + 1}/$count 段")
+                    _state.value = _state.value.copy(status = "翻译第 ${i + 1}/$count 段...")
+                    val chinese = try {
+                        api.translate(baseUrl = settings.translateBaseUrl, apiKey = settings.translateApiKey,
+                            model = settings.translateModel, text = raw)
+                    } catch (e: Exception) { "[翻译失败: ${e.message}]" }
+                    newEntries.add(TranslationEntry(english = raw, chinese = chinese, timestamp = ts))
+                }
+                _state.value = _state.value.copy(
+                    entries = _state.value.entries + newEntries,
+                    isProcessing = false, status = "完成（$count 段）"
+                )
+                newEntries.forEach { autoSave(it) }
+                onProgress("完成")
+                onComplete()
+            } catch (e: Exception) {
+                Log.e(TAG, "Whole session failed", e)
+                _state.value = _state.value.copy(isProcessing = false, status = "就绪",
+                    error = "整课转录失败: ${e.message}")
+            }
+        }
+    }
+
+    private fun formatTime(sec: Double): String {
+        val total = sec.toInt()
+        val m = total / 60
+        val s = total % 60
+        return "%02d:%02d".format(m, s)
+    }
+
 
     private suspend fun translateAndAdd(text: String, settings: AppSettings, startTime: Long) {
         try {

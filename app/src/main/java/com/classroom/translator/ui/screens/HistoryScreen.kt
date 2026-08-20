@@ -69,7 +69,8 @@ import com.classroom.translator.ui.theme.Green500
 fun HistoryScreen(
     onNavigateToRecording: () -> Unit,
     onNavigateToSession: (Long) -> Unit,
-    onNavigateToSettings: () -> Unit = {}
+    onNavigateToSettings: () -> Unit = {},
+    onNavigateToWholeSession: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var sessions by remember { mutableStateOf<List<TranslationSession>>(emptyList()) }
@@ -90,6 +91,9 @@ fun HistoryScreen(
                     )
                 },
                 actions = {
+                    TextButton(onClick = onNavigateToWholeSession) {
+                        Text("整课转录", color = Color.White)
+                    }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "设置")
                     }

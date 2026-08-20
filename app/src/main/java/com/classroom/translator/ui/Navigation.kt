@@ -11,6 +11,7 @@ import com.classroom.translator.ui.screens.HistoryScreen
 import com.classroom.translator.ui.screens.MainScreen
 import com.classroom.translator.ui.screens.SessionDetailScreen
 import com.classroom.translator.ui.screens.SettingsScreen
+import com.classroom.translator.ui.screens.WholeSessionScreen
 
 @Composable
 fun MainNavHost() {
@@ -27,7 +28,8 @@ fun MainNavHost() {
                 onNavigateToSession = { sessionId ->
                     navController.navigate("session_detail/$sessionId")
                 },
-                onNavigateToSettings = { navController.navigate("settings") }
+                onNavigateToSettings = { navController.navigate("settings") },
+                onNavigateToWholeSession = { navController.navigate("whole_session") }
             )
         }
         composable("recording") {
@@ -44,6 +46,11 @@ fun MainNavHost() {
             val sessionId = backStackEntry.arguments?.getLong("sessionId") ?: 0L
             SessionDetailScreen(
                 sessionId = sessionId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable("whole_session") {
+            WholeSessionScreen(
                 onBack = { navController.popBackStack() }
             )
         }
