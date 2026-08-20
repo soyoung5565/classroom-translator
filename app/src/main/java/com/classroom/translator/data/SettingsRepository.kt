@@ -62,7 +62,15 @@ class SettingsRepository(private val context: Context) {
             chunkSeconds = prefs[CHUNK_SECONDS] ?: 8,
             asrLanguage = prefs[ASR_LANGUAGE] ?: "en",
             asrMode = if (rawAsrMode.isBlank() || rawAsrMode == "mimo") "dashscope" else rawAsrMode
-        )
+        ).let { s ->
+            // 本地 vLLM 模式：若 URL/模型还是云端默认，给本地默认值
+            if (s.asrMode == "local_vllm" && (s.asrBaseUrl.contains("dashscope") || s.asrBaseUrl.contains("xiaomimimo") || s.asrBaseUrl.isBlank())) {
+                s.copy(
+                    asrBaseUrl = "http://192.168.1.249:8000/v1",
+                    asrModel = if (s.asrModel.startsWith("Qwen3")) s.asrModel else "Qwen3-ASR-1.7B"
+                )
+            } else s
+        }
     }
 
     suspend fun update(block: (AppSettings) -> AppSettings) {

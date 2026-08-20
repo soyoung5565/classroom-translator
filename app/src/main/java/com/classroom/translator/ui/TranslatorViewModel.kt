@@ -9,6 +9,7 @@ import com.classroom.translator.api.OpenAiApi
 import com.classroom.translator.audio.AudioRecorder
 import com.classroom.translator.audio.WavEncoder
 import com.classroom.translator.audio.DashScopeAsrStream
+import com.classroom.translator.audio.LocalVllmAsrStream
 import com.classroom.translator.audio.AudioConverter
 import com.classroom.translator.data.AppSettings
 import com.classroom.translator.data.SettingsRepository
@@ -59,6 +60,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
     private val audioRecorder = AudioRecorder(app)
     private val api = OpenAiApi()
     private var dashScopeStream: DashScopeAsrStream? = null
+    private var localVllmStream: LocalVllmAsrStream? = null
     private val sessionManager = SessionManager(app)
 
     private var sessionStartTime: String = ""
@@ -100,6 +102,12 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         // DashScope streaming mode
         if (_state.value.settings.asrMode == "dashscope") {
             startDashScopeStreaming()
+            return
+        }
+
+        // Local vLLM (Qwen3-ASR) sentence-level streaming mode
+        if (_state.value.settings.asrMode == "local_vllm") {
+            startLocalVllmStreaming()
             return
         }
 
@@ -304,9 +312,77 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         dashScopeStream?.start()
     }
 
+    private fun startLocalVllmStreaming() {
+        val settings = _state.value.settings
+        val baseUrl = settings.asrBaseUrl.trimEnd('/')
+        Log.i(TAG, "Starting local vLLM streaming ASR @ $baseUrl (model=${settings.asrModel})")
+
+        localVllmStream = LocalVllmAsrStream(
+            baseUrl = baseUrl,
+            model = settings.asrModel,
+            onResult = { text, isFinal ->
+                if (text.isBlank()) return@LocalVllmAsrStream
+                Log.i(TAG, "vLLM result: $text (final=$isFinal)")
+                if (isFinal) {
+                    viewModelScope.launch(Dispatchers.Default) {
+                        val chinese = try {
+                            api.translate(
+                                baseUrl = settings.translateBaseUrl,
+                                apiKey = settings.translateApiKey,
+                                model = settings.translateModel,
+                                text = text
+                            )
+                        } catch (e: Exception) { "[翻译失败: ${e.message}]" }
+                        val entry = TranslationEntry(english = text, chinese = chinese)
+                        _state.value = _state.value.copy(entries = _state.value.entries + entry)
+                        autoSave(entry)
+                    }
+                }
+            },
+            onError = { err ->
+                Log.e(TAG, "vLLM error: $err")
+                _state.value = _state.value.copy(error = err)
+            },
+            onDisconnected = {
+                Log.i(TAG, "vLLM disconnected (sentence batch done)")
+            }
+        )
+        localVllmStream?.start()
+
+        // 分段发送循环：每 2 秒把累积音频送去转写
+        viewModelScope.launch(Dispatchers.IO) {
+            while (_state.value.isRecording && localVllmStream?.isActive() == true) {
+                delay(LocalVllmAsrStream.FLUSH_INTERVAL_MS)
+                if (!_state.value.isRecording) break
+                val text = try {
+                    localVllmStream?.transcribePending()
+                } catch (e: Exception) {
+                    Log.e(TAG, "transcribePending failed: ${e.message}")
+                    null
+                }
+                if (!text.isNullOrBlank()) {
+                    _state.value = _state.value.copy(status = "已识别: ${text.take(40)}")
+                } else {
+                    _state.value = _state.value.copy(status = "正在听...")
+                }
+                // 更新 VU 表
+                _state.value = _state.value.copy(audioLevel = audioRecorder.audioLevel)
+            }
+        }
+
+        // 把 AudioRecorder 的 PCM 流喂给 LocalVllmAsrStream
+        audioRecorder.setPcmListener { pcm ->
+            localVllmStream?.feedAudio(pcm)
+        }
+        Log.i(TAG, "Local vLLM streaming started")
+    }
+
     private fun stopRecording() {
         dashScopeStream?.stop()
         dashScopeStream = null
+        localVllmStream?.stop()
+        localVllmStream = null
+        audioRecorder.setPcmListener(null)
         val audioPath = audioRecorder.getAudioFilePath()
         audioRecorder.stop()
         _state.value = _state.value.copy(

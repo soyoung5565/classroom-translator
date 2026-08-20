@@ -102,7 +102,10 @@ fun SettingsScreen(
 
                     // Model dropdown
                     var asrExpanded by remember { mutableStateOf(false) }
-                    val asrModels = listOf("fun-asr-realtime-2026-02-28", "fun-asr-realtime")
+                    val asrModels = listOf(
+                        "Qwen3-ASR-1.7B", "Qwen3-ASR-0.6B",
+                        "fun-asr-realtime-2026-02-28", "fun-asr-realtime"
+                    )
                     ExposedDropdownMenuBox(
                         expanded = asrExpanded,
                         onExpandedChange = { asrExpanded = it }
@@ -121,6 +124,8 @@ fun SettingsScreen(
                                 DropdownMenuItem(
                                     text = {
                                         Text(when(model) {
+                                            "Qwen3-ASR-1.7B" -> "Qwen3-ASR-1.7B（本地最强）"
+                                            "Qwen3-ASR-0.6B" -> "Qwen3-ASR-0.6B（本地轻量）"
                                             "mimo-v2.5" -> "fun-asr-realtime-2026-02-28（最新）"
                                             "mimo-v2.5-asr" -> "fun-asr-realtime（稳定）"
                                             "mimo-v2-omni" -> "fun-asr-realtime-2026-02-28（最新）"
@@ -138,7 +143,11 @@ fun SettingsScreen(
 
                     // ASR Mode selector
                     var modeExpanded by remember { mutableStateOf(false) }
-                    val modes = listOf("dashscope" to "DashScope 流式 (推荐)", "mimo" to "MIMO 分段")
+                    val modes = listOf(
+                        "dashscope" to "DashScope 流式 (云端)",
+                        "local_vllm" to "本地 vLLM (Qwen3-ASR)",
+                        "mimo" to "MIMO 分段"
+                    )
                     ExposedDropdownMenuBox(
                         expanded = modeExpanded,
                         onExpandedChange = { modeExpanded = it }

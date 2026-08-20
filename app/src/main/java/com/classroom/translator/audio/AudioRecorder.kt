@@ -37,6 +37,10 @@ class AudioRecorder(private val context: Context) {
     private val pcmBuffer = ByteArrayOutputStream()
 
     @Volatile var audioLevel: Float = 0f; private set
+
+    /** 每次从麦克风读出 PCM 块后回调（用于 LocalVllmAsrStream 实时喂音频） */
+    @Volatile private var pcmListener: ((ByteArray) -> Unit)? = null
+    fun setPcmListener(listener: ((ByteArray) -> Unit)?) { pcmListener = listener }
     private var audioFilePath: String? = null
     private var audioFileOutputStream: FileOutputStream? = null
 
@@ -100,6 +104,8 @@ class AudioRecorder(private val context: Context) {
                                 pcmBuffer.write(readBuf, 0, read)
                             }
                             audioLevel = calculateRms(readBuf, read)
+                            // 回调给 LocalVllmAsrStream 等消费方
+                            try { pcmListener?.invoke(readBuf.copyOf(read)) } catch (e: Exception) {}
                             // Save to file
                             try { audioFileOutputStream?.write(readBuf, 0, read) } catch(e: Exception) {}
                         } else if (read < 0) {
@@ -130,6 +136,7 @@ class AudioRecorder(private val context: Context) {
 
     fun stop() {
         isRecording = false
+        pcmListener = null
         // Close audio file and fix WAV header
         try {
             audioFileOutputStream?.close()
