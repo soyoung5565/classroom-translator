@@ -100,40 +100,43 @@ fun SettingsScreen(
                         onChange = { viewModel.updateSettings { s -> s.copy(asrBaseUrl = it) } }
                     )
 
-                    // Model dropdown
+                    // ASR 引擎下拉: 三个最优引擎 (2026-09-07 大马口音混说评测)
                     var asrExpanded by remember { mutableStateOf(false) }
-                    val asrModels = listOf(
-                        "Qwen3-ASR",
-                        "fun-asr-realtime-2026-02-28", "fun-asr-realtime"
+                    // 每项 (model_id, display_name, base_url, needs_force_language)
+                    // base_url 默认 8000/8001, 用户也可手动改覆盖
+                    val asrEngines = listOf(
+                        Triple("Qwen3-ASR", "Qwen3-ASR-1.7B (本地 8000, 纯英语/马来单语)", "http://127.0.0.1:8000/v1"),
+                        Triple("polyglot-lion-1.7b", "Polyglot-Lion-1.7B (本地 8001, 新马4语混说)", "http://127.0.0.1:8001/v1"),
+                        Triple("fun-asr-realtime-2026-02-28", "FunASR Realtime (云端百炼, 仅中英)", "https://dashscope.aliyuncs.com/compatible-mode/v1")
                     )
                     ExposedDropdownMenuBox(
                         expanded = asrExpanded,
                         onExpandedChange = { asrExpanded = it }
                     ) {
+                        val currentLabel = asrEngines.find { it.first == settings.asrModel }?.second
+                            ?: "自定义: ${settings.asrModel}"
                         OutlinedTextField(
-                            value = settings.asrModel,
+                            value = currentLabel,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("模型") },
+                            label = { Text("ASR 引擎") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(asrExpanded) },
                             modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
                             colors = textFieldColors()
                         )
                         ExposedDropdownMenu(expanded = asrExpanded, onDismissRequest = { asrExpanded = false }) {
-                            asrModels.forEach { model ->
+                            asrEngines.forEach { (modelId, label, defaultUrl) ->
                                 DropdownMenuItem(
-                                    text = {
-                                        Text(when(model) {
-                                            "Qwen3-ASR-1.7B" -> "Qwen3-ASR-1.7B（本地最强）"
-                                            "Qwen3-ASR-0.6B" -> "Qwen3-ASR-0.6B（本地轻量）"
-                                            "mimo-v2.5" -> "fun-asr-realtime-2026-02-28（最新）"
-                                            "mimo-v2.5-asr" -> "fun-asr-realtime（稳定）"
-                                            "mimo-v2-omni" -> "fun-asr-realtime-2026-02-28（最新）"
-                                            else -> model
-                                        })
-                                    },
+                                    text = { Text(label) },
                                     onClick = {
-                                        viewModel.updateSettings { s -> s.copy(asrModel = model) }
+                                        // 切引擎时同步更新 baseUrl (用户可在下方手动覆盖)
+                                        viewModel.updateSettings { s ->
+                                            s.copy(
+                                                asrModel = modelId,
+                                                asrBaseUrl = if (s.asrBaseUrl.contains("127.0.0.1") || s.asrBaseUrl.contains("dashscope")) defaultUrl else s.asrBaseUrl,
+                                                asrMode = if (modelId.contains("fun-asr")) "dashscope" else "local_vllm"
+                                            )
+                                        }
                                         asrExpanded = false
                                     }
                                 )
@@ -269,13 +272,25 @@ fun SettingsScreen(
             SectionHeader("快速预设")
             Spacer(Modifier.height(8.dp))
 
-            PresetButton("本地 vLLM + 本地翻译 (推荐)") {
+            // 预设 1: Polyglot-Lion (混说最佳, 默认推荐)
+            PresetButton("Polyglot-Lion 混说 (本地 8001, 推荐)") {
+                viewModel.updateSettings { s -> s.copy(
+                    asrBaseUrl = "http://127.0.0.1:8001/v1",
+                    asrModel = "polyglot-lion-1.7b",
+                    asrLanguage = "auto",
+                    asrMode = "local_vllm",
+                    translateBaseUrl = "http://127.0.0.1:8002/v1",
+                    translateModel = "qwen3.5-2b"
+                )}
+            }
+            // 预设 2: Qwen3-ASR (纯英语最强, 备选)
+            PresetButton("Qwen3-ASR 纯英语 (本地 8000)") {
                 viewModel.updateSettings { s -> s.copy(
                     asrBaseUrl = "http://127.0.0.1:8000/v1",
                     asrModel = "Qwen3-ASR",
+                    asrLanguage = "auto",
                     asrMode = "local_vllm",
                     translateBaseUrl = "http://127.0.0.1:8002/v1",
-                    translateApiKey = "REDACTED_KEY",
                     translateModel = "qwen3.5-2b"
                 )}
             }

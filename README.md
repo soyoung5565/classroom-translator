@@ -44,3 +44,28 @@ D:/android-sdk/platform-tools/adb.exe install -r D:/classroom-translator/app-deb
 
 ## Git
 - 仓库仅本地（`D:\classroom-translator\.git`），无远程。每周备份脚本不覆盖此目录，**注意定期推送异地备份**。
+
+## 2026-09-07 增量：双 ASR 引擎手机实测对比
+
+新增第二个本地 ASR 服务 **Polyglot-Lion-0.6B** (端口 8001)，与已有 Qwen3-ASR-1.7B (端口 8000) 并存，
+方便手机端通过设置页一键切换对比实测。
+
+### 服务现状
+- `8000` Qwen3-ASR-1.7B (52 语, 纯英语/马来单语最强; CV26 93.5%)
+- `8001` Polyglot-Lion-0.6B (新马4语微调; Revolab 混说 86.2%, 8GB 显存友好)
+- 待补: `8003` FunASR-MLT-Nano-2512 (混说冠军 86.6%, 需另写 funasr 兼容服务)
+
+### App 端改动
+- 设置页加 "ASR 引擎" 下拉（3 选项：Qwen3-ASR / Polyglot-Lion / FunASR Realtime 云端）
+- 识别语种默认 `auto`，让模型自动检测语言支持混说转写
+- 两个新预设按钮："Polyglot-Lion 混说 (本地 8001, 推荐)" / "Qwen3-ASR 纯英语 (本地 8000)"
+
+### 启动 Polyglot-Lion 服务（8001）
+```bash
+cd /mnt/d/asr/eval && python polyglot_server.py \\
+    --model /mnt/d/asr/models/polyglot-lion-0.6b --port 8001
+```
+依赖：transformers 4.57 + qwen-asr 0.0.6（已 patch `@check_model_inputs()` 为 `@check_model_inputs`）
+
+### 评测依据
+见 `D:/asr/eval/RESULT_FINAL.md` (2026-08-30 全量 1453 句测试)

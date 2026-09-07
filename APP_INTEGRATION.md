@@ -83,3 +83,12 @@ App 同时支持两种"整课"工作模式：
   - 启动：`mumu-cli.exe control --vmindex 2 launch`
   - ADB 直连：`mumu-cli.exe adb --vmindex 2 --cmd "shell getprop ..."`
 - Android 16 上 `adb shell input tap` 受限（rc=255），UI 自动点击不可用
+
+## 2026-09-07 双 ASR 引擎（8000/8001）
+
+| 端口 | 服务 | 模型 | 强项 | 启动 |
+|---|---|---|---|---|
+| 8000 | (待恢复) | Qwen3-ASR-1.7B | 纯英语/马来单语最强 | 需重启服务 |
+| 8001 | ✅ 在线 | Polyglot-Lion-0.6B | 混说 86.2%, 8GB 显存 | `/mnt/d/asr/eval/polyglot_server.py --model /mnt/d/asr/models/polyglot-lion-0.6b --port 8001` |
+
+手机端设置页"ASR 引擎"下拉即可切换。

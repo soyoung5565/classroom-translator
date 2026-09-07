@@ -15,14 +15,14 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "se
 data class AppSettings(
     // ASR: 保留百炼 Fun-ASR Realtime (用户指定, minimax 套餐不含 ASR)
     val asrApiKey: String = "REDACTED_KEY",
-    val asrBaseUrl: String = "http://127.0.0.1:8000/v1",
-    val asrModel: String = "Qwen3-ASR",
+    val asrBaseUrl: String = "http://127.0.0.1:8001/v1",  // polyglot-lion 默认端口; 切 Qwen3-ASR 时改 8000
+    val asrModel: String = "polyglot-lion-1.7b",  // 默认混说最佳; 切 Qwen3-ASR 时改 "Qwen3-ASR"
     // LLM 翻译: 切到 minimax M3
     val translateApiKey: String = "REDACTED_KEY",
     val translateBaseUrl: String = "http://127.0.0.1:8002/v1",
     val translateModel: String = "qwen3.5-2b",
     val chunkSeconds: Int = 8,
-    val asrLanguage: String = "en",
+    val asrLanguage: String = "auto",  // 混说关键: auto 让模型自动检测, 支持马来+英语+中文混说
     val asrMode: String = "local_vllm"
 )
 
@@ -60,7 +60,7 @@ class SettingsRepository(private val context: Context) {
             translateBaseUrl = if (isOldTrans || rawTransUrl.isBlank()) "http://127.0.0.1:8002/v1" else rawTransUrl,
             translateModel = if (isOldTrans || rawTransModel.isBlank()) "qwen3.5-2b" else rawTransModel,
             chunkSeconds = prefs[CHUNK_SECONDS] ?: 8,
-            asrLanguage = prefs[ASR_LANGUAGE] ?: "en",
+            asrLanguage = prefs[ASR_LANGUAGE] ?: "auto",
             asrMode = if (rawAsrMode.isBlank() || rawAsrMode == "mimo") "local_vllm" else rawAsrMode
         ).let { s ->
             // 本地 vLLM 模式：若 URL/模型还是云端默认，给本地默认值

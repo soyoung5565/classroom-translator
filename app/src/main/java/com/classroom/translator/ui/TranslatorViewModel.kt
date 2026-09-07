@@ -325,9 +325,17 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         val baseUrl = settings.asrBaseUrl.trimEnd('/')
         Log.i(TAG, "Starting local vLLM streaming ASR @ $baseUrl (model=${settings.asrModel})")
 
+        // forceLanguage: "auto"/"en"/"zh" -> String?("English"/"Chinese"/null)
+        val langArg: String? = when (settings.asrLanguage) {
+            "en" -> "English"
+            "zh" -> "Chinese"
+            else -> null  // auto: 让 vLLM 自动检测, 支持马来+英语+中文混说
+        }
+        Log.i(TAG, "ASR language arg: ${langArg ?: "auto"}")
         localVllmStream = LocalVllmAsrStream(
             baseUrl = baseUrl,
             model = settings.asrModel,
+            forceLanguage = langArg,
             onResult = { text, isFinal ->
                 if (text.isBlank()) return@LocalVllmAsrStream
                 Log.i(TAG, "vLLM result: $text (final=$isFinal)")

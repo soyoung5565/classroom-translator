@@ -30,6 +30,8 @@ import java.util.concurrent.TimeUnit
 class LocalVllmAsrStream(
     private val baseUrl: String,          // e.g. http://192.168.1.249:8000/v1
     private val model: String = "Qwen3-ASR-1.7B",
+    // null = auto（让模型自动检测语言，支持马来+英语+中文混说）
+    private val forceLanguage: String? = null,
     private val onResult: (text: String, isFinal: Boolean) -> Unit,
     private val onError: (String) -> Unit,
     private val onDisconnected: () -> Unit = {}
@@ -98,7 +100,14 @@ class LocalVllmAsrStream(
                 put("messages", JSONArray().apply {
                     put(JSONObject().apply {
                         put("role", "user")
+                        // 若 forceLanguage 非空, 把 "language English<asr_text>" 作为文本提示传给 vLLM
+                        // (vLLM Qwen3-ASR 的 chat_template 会把这个加到 assistant prompt 前)
+                        // null = auto, 让模型自动检测支持混说
+                        val textContent = forceLanguage?.let { "language $it<asr_text>" } ?: ""
                         put("content", JSONArray().apply {
+                            if (textContent.isNotEmpty()) {
+                                put(JSONObject().apply { put("type", "text"); put("text", textContent) })
+                            }
                             put(JSONObject().apply {
                                 put("type", "audio_url")
                                 put("audio_url", JSONObject().apply {
