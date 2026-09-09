@@ -70,6 +70,9 @@ import com.classroom.translator.ui.theme.DarkSurfaceVariant
 import com.classroom.translator.ui.theme.Green500
 import com.classroom.translator.ui.theme.Orange500
 import com.classroom.translator.ui.theme.Red500
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import androidx.compose.runtime.rememberCoroutineScope
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,6 +82,7 @@ fun MainScreen(
     viewModel: TranslatorViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val testScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
     // Auto-scroll to bottom on new entries
@@ -143,6 +147,9 @@ fun MainScreen(
                     }
                     TextButton(onClick = { filePicker.launch(arrayOf("audio/wav", "audio/mpeg", "audio/mp3")) }) {
                         Text("导入", color = Color.White)
+                    TextButton(onClick = { testScope.launch(Dispatchers.IO) { try { viewModel.importAudioFile(java.io.File("/sdcard/Download/phonetest/test04.wav").readBytes(), "test04.wav") } catch (_: Exception) { } } }) {
+                        Text("自测", color = Color.White)
+                    }
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(

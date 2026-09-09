@@ -128,7 +128,7 @@ class OpenAiApi {
                 })
                 put(JSONObject().apply {
                     put("role", "user")
-                    put("content", text)
+                    put("content", if (model.contains("qwen", ignoreCase = true)) text + "\n/no_think" else text)
                 })
             })
             put("max_tokens", 2000)

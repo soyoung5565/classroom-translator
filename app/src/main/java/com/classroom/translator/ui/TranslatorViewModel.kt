@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.classroom.translator.audio.OfflineAsrEngine
 
 data class TranslationEntry(
     val id: Long = System.currentTimeMillis(),
@@ -506,12 +507,21 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     Pair(audioBytes, "wav")
                 }
-                val audioBase64 = Base64.encodeToString(audioData, Base64.NO_WRAP)
-                val english = api.transcribeAudio(
+                val english = if (settings.asrMode == "ondevice") {
+                    val lang = if (settings.asrLanguage == "ms") "ms" else "en"
+                    val r = OfflineAsrEngine.transcribe(getApplication(), audioData, "whisper-small", lang)
+                    val rtf = if (r.audioSec > 0) r.elapsedMs / 1000.0 / r.audioSec else 0.0
+                    Log.i(TAG, "Offline " + r.audioSec + "s -> '" + r.text.take(60) + "' (" + r.elapsedMs + "ms)")
+                    _state.value = _state.value.copy(status = "离线识别: " + fileName)
+                    r.text
+                } else {
+                    val audioBase64 = Base64.encodeToString(audioData, Base64.NO_WRAP)
+                    api.transcribeAudio(
                     baseUrl = settings.asrBaseUrl, apiKey = settings.asrApiKey,
                     model = settings.asrModel, audioBase64 = audioBase64,
                     format = format, language = settings.asrLanguage
                 )
+                }
                 if (english.isBlank()) {
                     _state.value = _state.value.copy(isProcessing = false, status = "就绪", error = "文件无语音内容")
                     return@launch

@@ -61,4 +61,7 @@ dependencies {
 
     // DataStore for settings
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // sherpa-onnx on-device ASR (offline mode, P2)
+    implementation(files("libs/sherpa-onnx-1.13.7.aar"))
 }

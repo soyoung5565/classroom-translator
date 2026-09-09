@@ -46,6 +46,12 @@ import com.classroom.translator.ui.theme.Blue500
 import com.classroom.translator.ui.theme.DarkOnSurfaceVariant
 import com.classroom.translator.ui.theme.DarkSurface
 import com.classroom.translator.ui.theme.DarkSurfaceVariant
+import kotlinx.coroutines.launch
+import com.classroom.translator.audio.DevTestRunner
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,7 +113,8 @@ fun SettingsScreen(
                     val asrEngines = listOf(
                         Triple("Qwen3-ASR", "Qwen3-ASR-1.7B (本地 8000, 纯英语/马来单语)", "http://127.0.0.1:8000/v1"),
                         Triple("polyglot-lion-1.7b", "Polyglot-Lion-1.7B (本地 8001, 新马4语混说)", "http://127.0.0.1:8001/v1"),
-                        Triple("fun-asr-realtime-2026-02-28", "FunASR Realtime (云端百炼, 仅中英)", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+                        Triple("fun-asr-realtime-2026-02-28", "FunASR Realtime (云端百炼, 仅中英)", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+                        Triple("ondevice-whisper", "本机离线 whisper-small (断网可用)", ""),
                     )
                     ExposedDropdownMenuBox(
                         expanded = asrExpanded,
@@ -134,7 +141,7 @@ fun SettingsScreen(
                                             s.copy(
                                                 asrModel = modelId,
                                                 asrBaseUrl = if (s.asrBaseUrl.contains("127.0.0.1") || s.asrBaseUrl.contains("dashscope")) defaultUrl else s.asrBaseUrl,
-                                                asrMode = if (modelId.contains("fun-asr")) "dashscope" else "local_vllm"
+                                                asrMode = if (modelId == "ondevice-whisper") "ondevice" else if (modelId.contains("fun-asr")) "dashscope" else "local_vllm"
                                             )
                                         }
                                         asrExpanded = false
@@ -149,7 +156,8 @@ fun SettingsScreen(
                     val modes = listOf(
                         "dashscope" to "DashScope 流式 (云端)",
                         "local_vllm" to "本地 vLLM (Qwen3-ASR)",
-                        "mimo" to "MIMO 分段"
+                        "mimo" to "MIMO 分段",
+                        "ondevice" to "本机离线 (断网可用)",
                     )
                     ExposedDropdownMenuBox(
                         expanded = modeExpanded,
@@ -174,9 +182,28 @@ fun SettingsScreen(
                         }
                     }
 
+                    // On-device batch test (P2 harness)
+                    var testStatus by remember { mutableStateOf("") }
+                    val testScope = rememberCoroutineScope()
+                    val testCtx = LocalContext.current
+                    val permLauncher = rememberLauncherForActivityResult(
+                        ActivityResultContracts.RequestPermission()
+                    ) { granted ->
+                        if (granted) testScope.launch {
+                            DevTestRunner.runAll(testCtx) { s -> testStatus = s }
+                        } else testStatus = "need audio permission"
+                    }
+                    Button(
+                        onClick = {
+                            permLauncher.launch(android.Manifest.permission.READ_MEDIA_AUDIO)
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    ) { Text("机上30条实测（离线）") }
+                    if (testStatus.isNotEmpty()) Text(testStatus)
+
                     // Language dropdown
                     var langExpanded by remember { mutableStateOf(false) }
-                    val languages = listOf("en" to "英语（English）", "zh" to "中文", "auto" to "自动检测")
+                    val languages = listOf("en" to "英语（English）", "zh" to "中文", "ms" to "马来语（Malay）", "auto" to "自动检测")
                     ExposedDropdownMenuBox(
                         expanded = langExpanded,
                         onExpandedChange = { langExpanded = it }
