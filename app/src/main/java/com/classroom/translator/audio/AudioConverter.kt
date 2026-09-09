@@ -40,6 +40,27 @@ object AudioConverter {
     }
 
     /**
+     * Sniff audio format from magic bytes (not the file name).
+     * OpenDocument URIs often have no extension in lastPathSegment,
+     * so a real .wav would be misrouted into MediaCodec re-encode
+     * (which truncates long files on some devices). Returns
+     * "wav"/"mp3" or null if unknown.
+     */
+    fun sniffFormat(bytes: ByteArray): String? {
+        if (bytes.size >= 12 &&
+            bytes[0] == 0x52.toByte() && bytes[1] == 0x49.toByte() &&
+            bytes[2] == 0x46.toByte() && bytes[3] == 0x46.toByte() &&
+            bytes[8] == 0x57.toByte() && bytes[9] == 0x41.toByte() &&
+            bytes[10] == 0x56.toByte() && bytes[11] == 0x45.toByte()) return "wav"
+        if (bytes.size >= 3 &&
+            bytes[0] == 0x49.toByte() && bytes[1] == 0x44.toByte() &&
+            bytes[2] == 0x33.toByte()) return "mp3"
+        if (bytes.size >= 2 && bytes[0] == 0xFF.toByte() &&
+            (bytes[1].toInt() and 0xE0) == 0xE0) return "mp3"
+        return null
+    }
+
+    /**
      * Check if file needs conversion (not WAV or MP3)
      */
     fun needsConversion(fileName: String): Boolean {

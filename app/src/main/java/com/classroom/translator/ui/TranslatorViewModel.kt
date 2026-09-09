@@ -488,8 +488,12 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         kotlinx.coroutines.GlobalScope.launch(Dispatchers.Default) {
             _state.value = _state.value.copy(isProcessing = true, status = "正在识别: $fileName")
             try {
-                val needsConvert = AudioConverter.needsConversion(fileName)
-                val (audioData, format) = if (needsConvert) {
+                val sniffed = AudioConverter.sniffFormat(audioBytes)
+                val needsConvert = sniffed == null && AudioConverter.needsConversion(fileName)
+                val (audioData, format) = if (sniffed != null) {
+                    Log.i(TAG, "Import  sniffed as , sending directly")
+                    Pair(audioBytes, sniffed)
+                } else if (needsConvert) {
                     Log.i(TAG, "Converting $fileName to WAV...")
                     val converted = AudioConverter.convertToWav(getApplication(), audioBytes, fileName)
                     if (converted == null) {

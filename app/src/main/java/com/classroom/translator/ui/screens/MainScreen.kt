@@ -96,7 +96,18 @@ fun MainScreen(
         uri?.let {
             try {
                 val bytes = context.contentResolver.openInputStream(it)?.readBytes()
-                val name = it.lastPathSegment ?: "audio.wav"
+                var name = it.lastPathSegment ?: "audio.wav"
+                try {
+                    context.contentResolver.query(it, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                        if (c.moveToFirst()) {
+                            val idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            if (idx >= 0) {
+                                val dn = c.getString(idx)
+                                if (!dn.isNullOrBlank()) name = dn
+                            }
+                        }
+                    }
+                } catch (_: Exception) { }
                 if (bytes != null) viewModel.importAudioFile(bytes, name)
             } catch (e: Exception) {
                 viewModel.dismissError()
