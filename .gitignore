@@ -8,3 +8,8 @@ local.properties
 app-debug.apk
 test.wav
 .env
+# 编译垃圾
+.kotlin/
+hs_err_*.log
+replay_*.log
+build_apk.cmd

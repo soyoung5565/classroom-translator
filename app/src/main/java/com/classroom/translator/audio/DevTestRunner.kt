@@ -52,11 +52,14 @@ object DevTestRunner {
                 }
             }
             files.sortBy { it.first.name }
-            val kinds = if (files.isNotEmpty()) listOf("whisper-small", "qwen3-asr") else emptyList()
+            val filesSel = files.filter { (_, lang) -> lang == "en" }.toMutableList()
+            // 三模型全量对比：whisper-small / qwen3-asr / funasr-nano
+            val kinds = if (filesSel.isNotEmpty())
+                listOf("whisper-small", "qwen3-asr", "funasr-nano") else emptyList()
             val out = File(dl, "devtest_results.json")
             var done = 0
             for (kind in kinds) {
-            for ((w, lang) in files) {
+            for ((w, lang) in filesSel) {
                 val t0 = System.currentTimeMillis()
                 var hyp = ""
                 var err = ""
@@ -74,7 +77,7 @@ object DevTestRunner {
                     .put("err", err).put("ms", dt)
                 out.appendText(row.toString() + "\n")
                 done++
-                progress = "$done/${files.size * kinds.size} [$kind] ${w.name} ${dt}ms"
+                progress = "$done/${filesSel.size * kinds.size} [$kind] ${w.name} ${dt}ms"
                 onTick(progress)
                 Log.i(TAG, progress + " hyp=" + hyp.take(50))
             }
