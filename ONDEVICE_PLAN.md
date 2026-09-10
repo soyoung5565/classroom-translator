@@ -54,3 +54,34 @@
 - 机上批量打分走 App 内 DevTestRunner（设置页“机上30条实测”按钮），直读 /sdcard/Download 音频+refs，
   结果写 devtest_results.json。/o picker（模拟器 DocumentsUI 点选无响应）。
 - 测速明天真机补（短/中/长各一条看耗时）。
+
+## P1/P2 落地结果（2026-09-10 凌晨，hermes模拟器x86_64实测）
+- 机上30条（whisper-small-int8）：马来语14条76.9% / 大马口音英语16条84.7%，0报错。
+  与电脑同模型分数一致（73.6%/85.8%），端侧链路无损。
+- 端到端：离线识别6.6s音频约2s（RTF~0.3，模拟器x86；真机速度明天补测短/中/长各一条）+
+  翻译0.2s（Qwen3-0.6B + /no_think；之前Qwen3.5-2B要先想70s，已切）+双语卡片。
+- 修过的坑：sherpa构造传null AssetManager；模型拷贝要验need文件（毒丸.ready）；
+  /sdcard直读要MANAGE_EXTERNAL_STORAGE（adb appops授）；模拟器DocumentsUI点选无响应→改App内直读。
+- 待办（明天）：真机3条测速；翻译质量（0.6B弱）；直播麦克风流式切端侧；Qwen3-ASR-0.6B GGUF已备，Android编译（Termux路线）。
+- commit：端侧离线ASR+实测harness已进git（含47MB AAR）。
+
+## 三模型端侧实测终局（2026-09-10 下午，hermes模拟器 x86_64）
+| 模型 | 马来语 | 大马口音英语 | 端侧速度 | 结论 |
+|---|---|---|---|---|
+| whisper-small-int8 | 76.9% | 84.7% | RTF~0.3，30条全过 | ✅ 端侧正解（已集成默认） |
+| Qwen3-ASR-0.6B-int8 | 转出真马来语(p05近全对) | 待真机 | RTF~2-3，6条后OOM崩 | ⚠️ 能跑但慢；适合整课离线，不适合实时 |
+| FunASR-Nano | 0%纯幻觉 | 88.8%(PC) | RTF~2-3，崩 | ❌ 出局（马来语废+崩） |
+- Qwen3 路径：sherpa-onnx 官方模型(943M) + Java桥（Kotlin metadata藏类）。maxTotalLen必须>0。
+- 模拟器8GB内存跑不动连续LLM解码；真机12GB待验。
+- 三模型全部端侧实测一轮完成，真机测速仍待用户插手机。
+
+## 真机测速终局（2026-09-10 晚，Redmi 25102RKBEC 真机 ee5d93b7）
+- **大马口音英语 12 条（whisper-small-int8, en-only）**：正确率 89.5%（WER 10.5%，模拟器 84.7% → 真机更高），5/12 全对。
+- **速度（骁龙8 Elite 真机）**：平均每条 1046ms 处理 5.7s 音频 = **RTF 0.16**（稳定值，去掉首条模型加载 0.57），
+  即 6 秒音频约 1 秒出字，实时性达标（门 RTF<1 大幅通过）。
+- **稳定性**：12 条连续跑 0 报错 0 崩，12GB 内存无压力（模拟器 8GB 崩的 Qwen3 路径真机顺跑待验）。
+- 修坑：真机 App 内部存储 whisper 模型上次拷贝失败只剩 .ready 毒丸 → 手动 push+cp 374MB 进 files/offline/whisper-small 并打 .ready2；
+  run-as 身份读不了 /sdcard，需经 /data/local/tmp 中转（adb push 35MB/s）。
+- 触发入口：设置页"机上30条实测（离线）"按钮（UI 坐标 600,1440）；结果写 /sdcard/Download/devtest_results.json
+  （phonetest24 的 p13-p24 每条被枚举两遍=24 条记录，去重后 12 条）。
+- P2 真机侧核心验证完成：模型加载 ✓ 识别速度 ✓ 连续稳定性 ✓。待办：直播麦克风流式切端侧；Qwen3-ASR 真机待验。
