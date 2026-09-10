@@ -52,14 +52,16 @@ object DevTestRunner {
                 }
             }
             files.sortBy { it.first.name }
+            val kinds = if (files.isNotEmpty()) listOf("whisper-small", "qwen3-asr") else emptyList()
             val out = File(dl, "devtest_results.json")
             var done = 0
+            for (kind in kinds) {
             for ((w, lang) in files) {
                 val t0 = System.currentTimeMillis()
                 var hyp = ""
                 var err = ""
                 try {
-                    val r = OfflineAsrEngine.transcribe(ctx, w.readBytes(), "whisper-small", lang)
+                    val r = OfflineAsrEngine.transcribe(ctx, w.readBytes(), kind, lang)
                     hyp = r.text
                 } catch (e: Exception) {
                     err = (e.message ?: "error").take(120)
@@ -67,16 +69,17 @@ object DevTestRunner {
                 }
                 val dt = System.currentTimeMillis() - t0
                 val row = JSONObject()
-                    .put("file", w.name).put("lang", lang)
+                    .put("file", w.name).put("lang", lang).put("kind", kind)
                     .put("ref", refs[w.name]).put("hyp", hyp)
                     .put("err", err).put("ms", dt)
                 out.appendText(row.toString() + "\n")
                 done++
-                progress = "$done/${files.size} ${w.name} ${dt}ms"
+                progress = "$done/${files.size * kinds.size} [$kind] ${w.name} ${dt}ms"
                 onTick(progress)
                 Log.i(TAG, progress + " hyp=" + hyp.take(50))
             }
             doneJson = out.absolutePath
+            }
         } finally {
             running = false
         }

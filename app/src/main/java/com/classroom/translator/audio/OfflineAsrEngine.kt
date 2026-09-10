@@ -28,24 +28,32 @@ object OfflineAsrEngine {
     fun appModelsDir(ctx: Context): File =
         File(ctx.getExternalFilesDir(null), "models")
 
-    private val NEED = arrayOf("small-encoder.int8.onnx", "small-decoder.int8.onnx", "small-tokens.txt")
+    private fun needFiles(kind: String): Array<String> = when (kind) {
+        "funasr-nano" -> arrayOf("encoder_adaptor.int8.onnx", "llm.int8.onnx", "embedding.int8.onnx",
+            "Qwen3-0.6B/tokenizer.json", "Qwen3-0.6B/vocab.json", "Qwen3-0.6B/merges.txt")
+        "qwen3-asr" -> arrayOf("conv_frontend.onnx", "encoder.int8.onnx", "decoder.int8.onnx",
+            "tokenizer/vocab.json", "tokenizer/merges.txt", "tokenizer/tokenizer_config.json")
+        else -> arrayOf("small-encoder.int8.onnx", "small-decoder.int8.onnx", "small-tokens.txt")
+    }
 
     private fun stageDir(ctx: Context, kind: String): File {
         val dst = File(ctx.filesDir, "offline/" + kind)
-        if (!File(dst, ".ready2").exists() || !NEED.all { File(dst, it).exists() }) {
+        if (!File(dst, ".ready2").exists() || !needFiles(kind).all { File(dst, it).exists() }) {
             File(dst, ".ready").delete()
             File(dst, ".ready2").delete()
             dst.mkdirs()
             val src = File("/sdcard/models/" + kind)
             var ok = true
-            for (f in (src.listFiles() ?: emptyArray())) {
-                try {
-                    f.copyTo(File(dst, f.name), overwrite = true)
-                } catch (e: Exception) {
-                    Log.e(TAG, "copy failed " + f.name, e); ok = false
+            fun copyTree(from: java.io.File, to: java.io.File) {
+                if (from.isDirectory) {
+                    to.mkdirs()
+                    for (c in from.listFiles() ?: emptyArray()) copyTree(c, java.io.File(to, c.name))
+                } else {
+                    try { from.copyTo(to, overwrite = true) } catch (e: Exception) { Log.e(TAG, "copy failed " + from.name, e); ok = false }
                 }
             }
-            var haveAll = NEED.all { File(dst, it).exists() }
+            copyTree(src, dst)
+            var haveAll = needFiles(kind).all { File(dst, it).exists() }
             if (ok && haveAll) File(dst, ".ready2").createNewFile()
         }
         return dst
@@ -70,10 +78,27 @@ object OfflineAsrEngine {
 
     fun recognizer(ctx: Context, kind: String, lang: String): OfflineRecognizer {
         synchronized(lock) {
+            if (kind == "qwen3-asr") {
+                val d = stageDir(ctx, "qwen3-asr")
+                return Qwen3AsrBridge.create(
+                    File(d, "conv_frontend.onnx").absolutePath,
+                    File(d, "encoder.int8.onnx").absolutePath,
+                    File(d, "decoder.int8.onnx").absolutePath,
+                    File(d, "tokenizer").absolutePath,
+                    4, 200
+                )
+            }
             if (kind == "funasr-nano") {
-                // Challenger slot: files land in /sdcard/models/funasr-nano/ (tokens + model.onnx).
-                // Wired once the export is verified on PC.
-                throw IllegalStateException("funasr-nano not staged yet")
+                val d = stageDir(ctx, "funasr-nano")
+                val f = OfflineFunAsrNanoModelConfig(
+                    encoderAdaptor = File(d, "encoder_adaptor.int8.onnx").absolutePath,
+                    llm = File(d, "llm.int8.onnx").absolutePath,
+                    embedding = File(d, "embedding.int8.onnx").absolutePath,
+                    tokenizer = File(d, "Qwen3-0.6B").absolutePath,
+                    maxNewTokens = 512
+                )
+                val m = OfflineModelConfig(funasrNano = f, modelType = "funasr_nano", numThreads = 4)
+                return OfflineRecognizer(null, OfflineRecognizerConfig(featConfig = FeatureConfig(), modelConfig = m))
             }
             return if (lang == "en") {
                 if (whisperEn == null) whisperEn = whisper(ctx, "en")
