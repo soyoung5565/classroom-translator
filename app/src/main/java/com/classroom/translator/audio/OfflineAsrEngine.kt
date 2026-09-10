@@ -60,7 +60,7 @@ object OfflineAsrEngine {
     }
 
     private fun whisper(
-        ctx: Context, lang: String, numThreads: Int = 4
+        ctx: Context, lang: String, numThreads: Int = 8
     ): OfflineRecognizer {
         val d = stageDir(ctx, "whisper-small")
         val enc = File(d, "small-encoder.int8.onnx").absolutePath
@@ -85,7 +85,7 @@ object OfflineAsrEngine {
                     File(d, "encoder.int8.onnx").absolutePath,
                     File(d, "decoder.int8.onnx").absolutePath,
                     File(d, "tokenizer").absolutePath,
-                    4, 200
+                    8, 200
                 )
             }
             if (kind == "funasr-nano") {
@@ -97,7 +97,7 @@ object OfflineAsrEngine {
                     tokenizer = File(d, "Qwen3-0.6B").absolutePath,
                     maxNewTokens = 512
                 )
-                val m = OfflineModelConfig(funasrNano = f, modelType = "funasr_nano", numThreads = 4)
+                val m = OfflineModelConfig(funasrNano = f, modelType = "funasr_nano", numThreads = 8)
                 return OfflineRecognizer(null, OfflineRecognizerConfig(featConfig = FeatureConfig(), modelConfig = m))
             }
             return if (lang == "en") {
@@ -148,14 +148,25 @@ object OfflineAsrEngine {
         val samples = wavToFloat(wavBytes)
             ?: return Result("[unsupported audio: need 16k mono wav]", 0, 0f)
         val rec = recognizer(ctx, kind, lang)
-        val stream = rec.createStream()
-        val t0 = System.currentTimeMillis()
-        stream.acceptWaveform(samples, 16000)
-        rec.decode(stream)
-        val text = rec.getResult(stream).text.trim()
-        stream.release()
-        val dt = System.currentTimeMillis() - t0
-        return Result(text, dt, samples.size / 16000.0f)
+        try {
+            val stream = rec.createStream()
+            try {
+                val t0 = System.currentTimeMillis()
+                stream.acceptWaveform(samples, 16000)
+                rec.decode(stream)
+                val text = rec.getResult(stream).text.trim()
+                val dt = System.currentTimeMillis() - t0
+                return Result(text, dt, samples.size / 16000.0f)
+            } finally {
+                stream.release()
+            }
+        } finally {
+            // funasr/qwen3 是每次新建的实例，用完必须释放，否则内存只涨不降（越跑越慢直至被杀）
+            // whisper 走缓存实例（whisperMs/whisperEn），不在此释放
+            if (kind != "whisper-small") {
+                try { rec.release() } catch (_: Exception) { }
+            }
+        }
     }
 
     fun releaseAll() {

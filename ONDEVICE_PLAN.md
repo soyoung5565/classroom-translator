@@ -86,14 +86,18 @@
   （phonetest24 的 p13-p24 每条被枚举两遍=24 条记录，去重后 12 条）。
 - P2 真机侧核心验证完成：模型加载 ✓ 识别速度 ✓ 连续稳定性 ✓。待办：直播麦克风流式切端侧；Qwen3-ASR 真机待验。
 
-## 三模型真机终局（2026-09-11 凌晨，Redmi 真机 ee5d93b7，en 12 条）
-| 模型 | 正确率 | 平均耗时/条 | 24条连续 | 结论 |
+## 三模型真机终局 V2（2026-09-11 凌晨，Redmi 真机 ee5d93b7，大马口音英语 en 12 条，修正版）
+| 模型 | 正确率 | 速度 | 24条连续 | 结论 |
 |---|---|---|---|---|
-| whisper-small-int8 | 89.5% (5/12全对) | 1.1s (RTF 0.16) | ✅ 24/24 全过 | **端侧唯一正解**（快+稳+准） |
-| qwen3-asr (0.6B) | 80.3% (样本4条) | 12.1s (RTF ~2) | ❌ 崩于 p17 (第8条) | 慢+连续解码被杀，只适合清后台整课离线 |
-| funasr-nano | 86.5% (样本6条) | 9.1s (RTF ~1.6) | ❌ 崩于 p18 (第11条) | 慢+连续解码被杀，出局 |
-- **崩因**：不是 native crash（无 tombstone），是连续解码内存持续走高 → 系统 critical_mem_pressure LMK 杀进程（死亡码2 SIGINT）；
-  手机后台微信/QQ/豆包占用大（MemFree 一度只剩 142MB），清掉后台能多撑几条但撑不完 24 条。
-- whisper 是唯一能扛住连续 24 条不崩的，正确率还最高 → 维持默认引擎结论不变。
-- 跑法备忘：三模型 runner 改 kinds 列表（whisper/qwen3/funasr）分别编包；结果每文件枚举两遍需去重；
-  触发=设置页"机上30条实测"；模型在 /data/data/.../files/offline/<kind>/ 打 .ready2 免启动重拷。
+| whisper-small-int8 | 89.5% (5/12全对) | 1.1s/条 (RTF 0.16) | ✅ 24/24 | ✅ 实时可用（快+稳+准） |
+| qwen3-asr-0.6B (llama.cpp Q8_0) | **90.5% (7/12全对)** | 编码 RTF 0.09 (常驻) | ✅ 12/12 CLI | ✅ 质量最高+最快（常驻服务） |
+| funasr-mlt (31语含马来语) | 87.4% (4/12全对) | 6.1s/条 (RTF 1.07) | ✅ 24/24（修复后） | ❌ 实时不达标（RTF>1） |
+- **版本修正**：之前测的 funasr-nano 是官方 Nano（中英日无马来语）→ 马来语 0% 是必然的；换 luigi000/fun-asr-mlt-nano-onnx-int8（31语含马来语）后 87.4%。
+- **Qwen3 路线修正**：sherpa-onnx onnx 版（每次新建 recognizer 不释放→内存只涨不降→崩）弃用；
+  换 llama.cpp 官方 mtmd 路线（Q8_0 text 805MB + mmproj 214MB），真机 12 条全过，编码 RTF 0.09 全场最快，质量 90.5% 全场最高。
+- **内存 bug 根因**：OfflineAsrEngine.transcribe 对 funasr/qwen3 每次 new OfflineRecognizer 用完不 release → 内存泄漏越跑越慢直至被杀。
+  修复：transcribe finally 里 kind != whisper 时 rec.release()。修复后 funasr-mlt 24/24 不崩，速度恒定（首5条 6330ms vs 末5条 5943ms）。
+- **结论**：Qwen3-ASR（llama.cpp 常驻）是端侧最优——正确率最高、速度最快；whisper-small 是可靠的实时后备；FunASR-MLT 正确率可接受但 RTF>1 只适合离线。
+- 跑法备忘：Qwen3 用 /data/local/tmp/qwen3asr/llama-mtmd-cli（LD_LIBRARY_PATH=./lib），
+  `-m Qwen3-ASR-0.6B-Q8_0.gguf --mmproj mmproj-Q8_0.gguf --audio wav -p "Transcribe the audio." -t 8 --temp 0`，
+  输出剥离 `language English<asr_text>` 前缀；App 内 DevTestRunner 改 kinds 列表 + releaseAll 修复已提交。

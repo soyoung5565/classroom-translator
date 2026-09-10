@@ -53,9 +53,9 @@ object DevTestRunner {
             }
             files.sortBy { it.first.name }
             val filesSel = files.filter { (_, lang) -> lang == "en" }.toMutableList()
-            // 三模型全量对比：whisper-small / qwen3-asr / funasr-nano
+            // 阶段验证：单测 FunASR-MLT（31语含马来语，真机）
             val kinds = if (filesSel.isNotEmpty())
-                listOf("whisper-small", "qwen3-asr", "funasr-nano") else emptyList()
+                listOf("funasr-nano") else emptyList()
             val out = File(dl, "devtest_results.json")
             var done = 0
             for (kind in kinds) {
@@ -80,6 +80,8 @@ object DevTestRunner {
                 progress = "$done/${filesSel.size * kinds.size} [$kind] ${w.name} ${dt}ms"
                 onTick(progress)
                 Log.i(TAG, progress + " hyp=" + hyp.take(50))
+                // 每条重建 recognizer：防非流式模型连续解码内存增长（sherpa issue #1571）
+                OfflineAsrEngine.releaseAll()
             }
             doneJson = out.absolutePath
             }
