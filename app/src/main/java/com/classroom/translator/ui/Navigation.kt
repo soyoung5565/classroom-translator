@@ -17,6 +17,8 @@ import com.classroom.translator.ui.screens.WholeSessionScreen
 fun MainNavHost() {
     val navController = rememberNavController()
     val sharedViewModel: TranslatorViewModel = viewModel()
+    // 供 MainActivity 传递 MediaProjection（测试模式内录）
+    (navController.context.applicationContext as com.classroom.translator.TranslatorApp).viewModel = sharedViewModel
 
     NavHost(navController = navController, startDestination = "history") {
         composable("history") {

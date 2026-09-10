@@ -101,3 +101,28 @@
 - 跑法备忘：Qwen3 用 /data/local/tmp/qwen3asr/llama-mtmd-cli（LD_LIBRARY_PATH=./lib），
   `-m Qwen3-ASR-0.6B-Q8_0.gguf --mmproj mmproj-Q8_0.gguf --audio wav -p "Transcribe the audio." -t 8 --temp 0`，
   输出剥离 `language English<asr_text>` 前缀；App 内 DevTestRunner 改 kinds 列表 + releaseAll 修复已提交。
+
+## 真机流式内录端到端测试（2026-09-11 凌晨）
+### 方案
+- App 新增测试模式：MediaProjection 授权（Android14+ 需 mediaProjection 前台服务，服务就绪后 getMediaProjection）→
+  PlaybackCaptureRecorder 内录系统声音（AudioPlaybackCapture, USAGE_MEDIA）→ 分句（2s flush）→
+  端侧 llama-server (127.0.0.1:8080, Qwen3-ASR-0.6B-Q8_0) input_audio 格式 → 识别回 UI + 翻译。
+- 素材：BV14hPxepEHY_16k.wav（B站 Asian Boss 吉隆坡街头采访，24.8 分钟真实大马口音英语）+ reference_en.txt OCR 真值。
+- 内录原因：声音走系统内部，音量可调最小不打扰；麦克风路径完全保留（真实场景仍走麦克风）。
+### 初步数据（前 116 句，5 分钟）
+- 延迟：平均 511ms，最小 219ms，最大 785ms —— 远超实时要求（无"说三四句才出一句"）。
+- llama-server 累计处理 4000+ 流式请求 0 崩溃；识别内容与 reference_en.txt 高度吻合。
+### 关键坑（已修）
+- Android14+ MediaProjection 必须先启 type=mediaProjection 前台服务，且等 startForeground 完成后再 getMediaProjection（否则 RemoteException 闪退）。
+- llama-server 用 input_audio 格式（非 vLLM 的 audio_url）。
+- 测试模式 baseUrl 硬编码 127.0.0.1:8080（不依赖 UI 设置，避免 adb 输入乱字符）。
+- autoSave 改内部存储（外部存储 MANAGE_EXTERNAL_STORAGE 重装后授权丢失）。
+
+
+## 真机 24.8 分钟流式测试（2026-09-11 凌晨，VAD+前缀续听版）
+- 素材 BV14hPxepEHY_16k.wav 完整播完 24.8min，MediaProjection 内录全程稳定无崩溃。
+- 实测走手机端 llama-server(8080) Qwen3-ASR-0.6B（ld测试入口写死 8080，并非 whisper——注意偏离）。
+- 前 5 分钟 ASR 正常（20 条，正确率约64% 保守值，延迟 1.2s->25.6s 递增）。
+- 04:35 后卡死：前缀续听全量累积（cumulative text + 全部缓冲音频整段重发，-c 4096），单次推理 22+ 分钟无返回。
+- 翻译 20/20 失败：手机侧无 8002 服务（只起了 8080 ASR 实例；PC 8002 也没起；adb reverse 重启丢失）。
+- 结论：前缀续听必须改滑动窗口（只发增量+最近N句）或回退短句分段（03:08 轮 488 句全程跑完无卡死）；翻译服务需补起；whisper-small 整课能力待单独验证。详见 TEST_REPORT_20260911.md

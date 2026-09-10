@@ -10,6 +10,7 @@ import com.classroom.translator.audio.AudioRecorder
 import com.classroom.translator.audio.WavEncoder
 import com.classroom.translator.audio.DashScopeAsrStream
 import com.classroom.translator.audio.LocalVllmAsrStream
+import com.classroom.translator.audio.PlaybackCaptureRecorder
 import com.classroom.translator.audio.AudioConverter
 import com.classroom.translator.data.AppSettings
 import com.classroom.translator.data.SettingsRepository
@@ -72,6 +73,32 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
     private var localVllmStream: LocalVllmAsrStream? = null
     private val sessionManager = SessionManager(app)
 
+    // ===== 测试模式（内录流式）=====
+    private val playbackRecorder = PlaybackCaptureRecorder(app)
+    private var mediaPlayer: android.media.MediaPlayer? = null
+    // 测试素材：播放 + 内录喂 ASR；realPlaybackLatencyMs 记录"说话开始到 ASR 出字"的延迟
+    @Volatile private var testModeActive = false
+    @Volatile private var testPlaybackStartMs = 0L
+    @Volatile var testLatencyMs: Long = 0L; private set
+    // MediaProjection（由 Activity 授权后传入）
+    private var mediaProjection: android.media.projection.MediaProjection? = null
+    @Volatile private var pendingTestPath: String? = null
+    fun setMediaProjection(mp: android.media.projection.MediaProjection?) {
+        mediaProjection = mp
+        // 授权就绪时，如果有待测试素材，自动启动测试
+        if (mp != null) {
+            pendingTestPath?.let { path ->
+                pendingTestPath = null
+                startTestPlayback(path)
+            }
+        }
+    }
+    /** 设置待测试素材并请求授权（授权回来后自动开始） */
+    fun requestTestWithProjection(path: String) {
+        pendingTestPath = path
+    }
+    fun getPlaybackRecorder(): PlaybackCaptureRecorder = playbackRecorder
+
     private var sessionStartTime: String = ""
 
     private val _state = MutableStateFlow(TranslatorUiState())
@@ -96,6 +123,143 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
             stopRecording()
         } else {
             startRecording()
+        }
+    }
+
+    /**
+     * 测试模式：播放素材文件（系统媒体流）→ 内录（PlaybackCapture）→ 流式 ASR。
+     * 需先由 Activity 完成 MediaProjection 授权并调用 setMediaProjection。
+     * 声音全程走系统内部，无需外放（音量调最小也不影响测试，不打扰周围）。
+     */
+    fun startTestPlayback(audioPath: String) {
+        if (_state.value.isRecording) stopRecording()
+        // 授权可能还在路上（用户刚点了允许，回调还没到），轮询等最多 10s
+        var mp = mediaProjection
+        if (mp == null) {
+            _state.value = _state.value.copy(status = "等待屏幕录制授权...")
+            for (i in 0 until 40) {
+                Thread.sleep(250)
+                mp = mediaProjection
+                if (mp != null) break
+            }
+        }
+        if (mp == null) {
+            _state.value = _state.value.copy(error = "测试模式需要先授予屏幕录制/内录权限")
+            return
+        }
+        val file = java.io.File(audioPath)
+        if (!file.exists()) {
+            _state.value = _state.value.copy(error = "测试素材不存在: $audioPath")
+            return
+        }
+
+        testModeActive = true
+        _state.value = _state.value.copy(isRecording = true, status = "测试播放中...", error = null, entries = emptyList())
+
+        // 1. 内录启动（抓系统媒体流）
+        playbackRecorder.setPcmListener { pcm ->
+            localVllmStream?.feedAudio(pcm)
+        }
+        playbackRecorder.start(mp)
+
+        // 2. 复用 local_vllm 流式 ASR（baseUrl 指向端侧 llama-server）
+        startTestAsrStreaming()
+
+        // 3. 播放素材
+        try {
+            mediaPlayer?.release()
+            mediaPlayer = android.media.MediaPlayer().apply {
+                setDataSource(audioPath)
+                setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                setOnCompletionListener {
+                    Log.i(TAG, "Test playback finished")
+                }
+                prepare()
+                start()
+                testPlaybackStartMs = System.currentTimeMillis()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "MediaPlayer start failed", e)
+            _state.value = _state.value.copy(error = "播放失败: ${e.message}")
+            stopRecording()
+        }
+    }
+
+    /** 测试模式的流式 ASR：与 startLocalVllmStreaming 相同的分段循环，但指向端侧 llama-server */
+    private fun startTestAsrStreaming() {
+        val settings = _state.value.settings
+        // 测试模式固定走端侧 llama-server（127.0.0.1:8080），不依赖设置里的地址
+        val baseUrl = "http://127.0.0.1:8080/v1"
+        Log.i(TAG, "Test ASR streaming @ $baseUrl (inputAudioFormat=true, model=${settings.asrModel})")
+
+        val langArg: String? = when (settings.asrLanguage) {
+            "en" -> "English"
+            "zh" -> "Chinese"
+            else -> null
+        }
+        localVllmStream?.stop()
+        localVllmStream = LocalVllmAsrStream(
+            baseUrl = baseUrl,
+            model = settings.asrModel,
+            forceLanguage = langArg,
+            inputAudioFormat = true,   // llama-server 用 input_audio 格式
+            onResult = { text, isFinal ->
+                if (text.isBlank()) return@LocalVllmAsrStream
+                // 每句真实延迟：该句音频起点 -> 结果回来（由 LocalVllmAsrStream 统计）
+                val lat = localVllmStream?.lastLatencyMs ?: 0L
+                if (lat > 0) testLatencyMs = lat
+                Log.i(TAG, "Test ASR result ($testLatencyMs ms): $text")
+                if (isFinal) {
+                    viewModelScope.launch(Dispatchers.Default) {
+                        val chinese = try {
+                            api.translate(
+                                baseUrl = settings.translateBaseUrl,
+                                apiKey = settings.translateApiKey,
+                                model = settings.translateModel,
+                                text = text
+                            )
+                        } catch (e: Exception) { "[翻译失败: ${e.message}]" }
+                        val entry = TranslationEntry(english = text, chinese = chinese)
+                        _state.value = _state.value.copy(entries = _state.value.entries + entry)
+                        autoSave(entry)
+                    }
+                }
+            },
+            onError = { err ->
+                Log.e(TAG, "Test ASR error: $err")
+                _state.value = _state.value.copy(error = err)
+            },
+            onDisconnected = {
+                Log.i(TAG, "Test ASR disconnected")
+            }
+        )
+        localVllmStream?.start()
+
+        viewModelScope.launch(Dispatchers.IO) {
+            while (_state.value.isRecording && testModeActive && localVllmStream?.isActive() == true) {
+                // VAD 句末检测：每 200ms 查一次
+                delay(200)
+                if (!_state.value.isRecording || !testModeActive) break
+                val stream = localVllmStream ?: break
+                val sentenceEnd = stream.isSentenceEnd()
+                // 超时兜底：累计 ≥6s 且有过声音，强制发送（防止长句无停顿永远不发）
+                val forceTimeout = stream.bufferedMs() >= 6000L && stream.bufferedMs() > 0
+                if (!sentenceEnd && !forceTimeout) continue
+                val text = try {
+                    stream.transcribePending()
+                } catch (e: Exception) {
+                    Log.e(TAG, "test transcribePending failed: ${e.message}")
+                    null
+                }
+                _state.value = _state.value.copy(
+                    status = if (!text.isNullOrBlank()) "已识别(${testLatencyMs}ms): ${text.take(30)}" else "正在听..."
+                )
+            }
         }
     }
 
@@ -402,6 +566,16 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         audioRecorder.setPcmListener(null)
         val audioPath = audioRecorder.getAudioFilePath()
         audioRecorder.stop()
+
+        // 测试模式：停播放器 + 停内录
+        testModeActive = false
+        testPlaybackStartMs = 0L
+        playbackRecorder.setPcmListener(null)
+        playbackRecorder.stop()
+        try { mediaPlayer?.stop() } catch (_: Exception) {}
+        try { mediaPlayer?.release() } catch (_: Exception) {}
+        mediaPlayer = null
+
         _state.value = _state.value.copy(
             isRecording = false,
             audioLevel = 0f,
@@ -657,7 +831,8 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun autoSave(entry: TranslationEntry) {
         try {
-            val dir = File(getApplication<Application>().getExternalFilesDir(null), "translations")
+            // 用内部存储（100% 可写，不依赖外部存储权限）
+            val dir = File(getApplication<Application>().filesDir, "translations")
             dir.mkdirs()
             val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
             val file = File(dir, "translation_${date}.txt")

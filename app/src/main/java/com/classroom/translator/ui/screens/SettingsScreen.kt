@@ -201,7 +201,43 @@ fun SettingsScreen(
                     ) { Text("机上30条实测（离线）") }
                     if (testStatus.isNotEmpty()) Text(testStatus)
 
-                    // Language dropdown
+                    // ===== 流式内录测试模式（真实素材端到端）=====
+                    var testPath by remember { mutableStateOf("/sdcard/Download/BV14hPxepEHY_16k.wav") }
+                    var testMsg by remember { mutableStateOf("") }
+                    // 在 Composable 作用域拿 context/activity/VM（onClick 里不能调 LocalContext）
+                    val appCtx = LocalContext.current
+                    val activity = appCtx as? android.app.Activity
+                    val testVm = (appCtx.applicationContext as com.classroom.translator.TranslatorApp).viewModel
+                    OutlinedTextField(
+                        value = testPath,
+                        onValueChange = { testPath = it },
+                        label = { Text("测试素材路径") },
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        textStyle = MaterialTheme.typography.bodySmall,
+                        colors = textFieldColors()
+                    )
+                    Button(
+                        onClick = {
+                            if (testVm == null) { testMsg = "VM 未初始化"; return@Button }
+                            val act = activity as? com.classroom.translator.MainActivity
+                            if (act == null) { testMsg = "需要 MainActivity 上下文"; return@Button }
+                            // 记录待测素材；授权回调拿到 MediaProjection 后自动启动测试
+                            testVm.requestTestWithProjection(testPath)
+                            act.requestProjectionPermission()
+                            testMsg = "授权后自动开始测试（请允许屏幕录制）"
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    ) { Text("▶ 流式内录测试（播放素材→内录→ASR→翻译）") }
+                    if (testMsg.isNotEmpty()) Text(testMsg, style = MaterialTheme.typography.bodySmall)
+                    if (testVm != null && testVm.testLatencyMs > 0) {
+                        Text(
+                            "最近延迟: ${testVm.testLatencyMs}ms",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+// Language dropdown
                     var langExpanded by remember { mutableStateOf(false) }
                     val languages = listOf("en" to "英语（English）", "zh" to "中文", "ms" to "马来语（Malay）", "auto" to "自动检测")
                     ExposedDropdownMenuBox(
