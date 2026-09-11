@@ -21,10 +21,14 @@ import kotlin.math.sqrt
  *
  * 真正的流式（非切片）：
  * - VAD 句末检测：RMS 低于阈值持续 [minSilenceMs] 视为一句话说完 → 才发送
- * - 前缀续听：每次请求把"已识别全文"作为 text 前缀 + 新音频，模型基于前文续写增量
+ * - 前缀续听：每次请求把"最近已识别文本"作为 text 前缀 + 新音频，模型基于前文续写增量
  * - 增量提取：输出 = 前缀 + 增量，剥掉前缀得到新识别内容
  * 这对应 Qwen3-ASR 官方 streaming（2s chunk + prefix + token 回滚），
  * 而不是孤立 2s 硬切。
+ *
+ * 防卡死（2026-09-11 修，24.8min 真机实测暴露）：
+ * - 前缀只带滑动窗口（最近 MAX_PREFIX_CHARS 字符），禁止全量累积；
+ * - 单段音频硬上限 MAX_SEGMENT_MS，超出部分留在缓冲下轮再送。
  */
 class LocalVllmAsrStream(
     private val baseUrl: String,          // e.g. http://127.0.0.1:8080/v1
@@ -44,6 +48,16 @@ class LocalVllmAsrStream(
         internal const val MIN_SILENCE_MS = 500L        // 静音超500ms视为句末（快一点出结果）
         private const val SILENCE_RMS = 0.008f          // RMS 低于该值=静音（16k PCM 比例）
         private const val MIN_SEGMENT_MS = 800L          // 段最短 0.8s（太短不送）
+
+        // ===== 前缀续听防卡死 =====
+        // 前缀只带最近 N 字符（滑动窗口），禁止全量累积——
+        // 全量前缀会把 llama-server(-c 4096) 上下文灌满，单次推理从 1s 膨胀到 22+ 分钟。
+        private const val MAX_PREFIX_CHARS = 400
+        // 累积全文内存保护（只用于存盘/UI，不再参与请求）
+        private const val MAX_ACCUMULATED_CHARS = 20000
+        // 单段音频硬上限 8s：推理慢时新音频会继续进缓冲，超过 8s 的部分
+        // 留在缓冲下轮再送，防止"推理越慢→缓冲越长→推理更慢"死亡螺旋。
+        private const val MAX_SEGMENT_MS = 8000L
     }
 
     private val client = OkHttpClient.Builder()
@@ -116,23 +130,36 @@ class LocalVllmAsrStream(
 
     /**
      * 把当前段送去转写（由 VM 在句末或超时调用）。
-     * 请求 = 前缀（已识别全文）+ 新音频；输出剥前缀取增量。
+     * 请求 = 前缀（最近文本滑动窗口）+ 新音频；输出剥前缀取增量。
      * @return 增量文本，若有
      */
     suspend fun transcribePending(): String? = withContext(Dispatchers.IO) {
         if (!isActive) return@withContext null
         val pcm: ByteArray
+        val segStartMs: Long
         synchronized(pcmBuffer) {
-            pcm = pcmBuffer.toByteArray()
-            pcmBuffer.reset()
+            // 单段音频硬上限：只取前 MAX_SEGMENT_MS，多余留在缓冲下轮再送
+            val bytesPerMs = SAMPLE_RATE * 2 / 1000   // 16bit mono = 32 B/ms
+            val maxBytes = (MAX_SEGMENT_MS * bytesPerMs).toInt()
+            val all = pcmBuffer.toByteArray()
+            if (all.size > maxBytes) {
+                pcm = all.copyOfRange(0, maxBytes)
+                pcmBuffer.reset()
+                pcmBuffer.write(all, maxBytes, all.size - maxBytes)
+            } else {
+                pcm = all
+                pcmBuffer.reset()
+            }
+            segStartMs = pcmStartMs
+            pcmStartMs = System.currentTimeMillis()
         }
         if (pcm.size < SAMPLE_RATE / 2) return@withContext null   // 不足0.5s，忽略
 
         val wav = WavEncoder.encode(pcm)  // 16k mono 16bit WAV
         val b64 = Base64.encodeToString(wav, Base64.NO_WRAP)
         val dataUri = "data:audio/wav;base64,$b64"
-        // 前缀：已识别全文（模型基于它续写）
-        val prefix = accumulatedText.trim()
+        // 前缀：只带最近 MAX_PREFIX_CHARS 字符（滑动窗口），禁止全量累积
+        val prefix = accumulatedText.trim().takeLast(MAX_PREFIX_CHARS).trim()
 
         try {
             val payload = JSONObject().apply {
@@ -205,11 +232,13 @@ class LocalVllmAsrStream(
                     else cleanedNorm   // 兜底：整段当增量
                 }
 
-            // 累积全文（避免重复：若 delta 只是前缀裁切残留，忽略）
+            // 累积全文（内存保护：只保留最近 MAX_ACCUMULATED_CHARS）
             if (delta.isNotEmpty()) {
                 accumulatedText = (accumulatedText + " " + delta).trim()
-                val start = pcmStartMs
-                if (start > 0) lastLatencyMs = System.currentTimeMillis() - start
+                if (accumulatedText.length > MAX_ACCUMULATED_CHARS) {
+                    accumulatedText = accumulatedText.takeLast(MAX_ACCUMULATED_CHARS)
+                }
+                if (segStartMs > 0) lastLatencyMs = System.currentTimeMillis() - segStartMs
                 Log.i(TAG, "ASR delta(${lastLatencyMs}ms): $delta")
                 onResult(delta, true)
             }
