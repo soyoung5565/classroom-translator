@@ -128,10 +128,20 @@ class OpenAiApi {
                 })
                 put(JSONObject().apply {
                     put("role", "user")
-                    put("content", if (model.contains("qwen", ignoreCase = true)) text + "\n/no_think" else text)
+                    put("content", text)
                 })
             })
             put("max_tokens", 2000)
+            // Qwen3.x on llama.cpp: /no_think string suffix is IGNORED — the model
+            // still spends all max_tokens on thinking and returns empty content.
+            // Correct fix is chat_template_kwargs.enable_thinking=false, which
+            // llama.cpp maps to <think>...</think> removal in the Jinja template.
+            // Verified 2026-09-22 phone-side: 17s empty → 0.44-0.69s real translation.
+            if (model.contains("qwen", ignoreCase = true)) {
+                put("chat_template_kwargs", JSONObject().apply {
+                    put("enable_thinking", false)
+                })
+            }
         }
 
         val request = Request.Builder()
