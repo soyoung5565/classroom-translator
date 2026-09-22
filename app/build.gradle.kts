@@ -16,7 +16,14 @@ android {
         versionName = "1.0"
 
         // Read MiniMax-M3 API key from local.properties (not committed)
+        // gradleProperty 只读 Gradle 属性(不含 local.properties!) —— 之前编译进去的是 "null"
+        // 双路读取: -P 传参优先, 否则从 local.properties 读 (2026-09-22 修复)
+        val lpProps = java.util.Properties().apply {
+            val lp = rootProject.file("local.properties")
+            if (lp.exists()) lp.inputStream().use { load(it) }
+        }
         val minimaxKey = providers.gradleProperty("MINIMAX_CN_API_KEY").orNull
+            ?: lpProps.getProperty("MINIMAX_CN_API_KEY")
         buildConfigField("String", "MINIMAX_API_KEY", "\"$minimaxKey\"")
         buildConfigField("String", "MINIMAX_BASE_URL", "\"https://api.minimaxi.com/anthropic\"")
         buildConfigField("String", "MINIMAX_MODEL", "\"MiniMax-M3\"")
