@@ -268,6 +268,35 @@ fun SettingsScreen(
                 }
             }
 
+            // 云端翻译 (流式后覆盖 / 双端矫正) - 默认值编译进 BuildConfig,用户可改
+            Spacer(Modifier.height(16.dp))
+            SectionHeader("云端翻译 (M3 默认, 覆盖本地翻译)")
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    SettingTextField(
+                        label = "云端密钥",
+                        value = settings.cloudApiKey,
+                        isPassword = true,
+                        onChange = { viewModel.updateSettings { s -> s.copy(cloudApiKey = it) } }
+                    )
+                    SettingTextField(
+                        label = "云端接口地址",
+                        value = settings.cloudBaseUrl,
+                        onChange = { viewModel.updateSettings { s -> s.copy(cloudBaseUrl = it) } }
+                    )
+                    SettingTextField(
+                        label = "云端模型",
+                        value = settings.cloudModel,
+                        onChange = { viewModel.updateSettings { s -> s.copy(cloudModel = it) } }
+                    )
+                    Text(
+                        "默认值由 BuildConfig 注入,无需填即可使用 M3 直连 minimaxi.com",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             Spacer(Modifier.height(20.dp))
 
             // Translation Section

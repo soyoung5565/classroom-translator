@@ -237,19 +237,25 @@ class OpenAiApi {
      * Used for the "cloud override" path: local translation shows first (fast),
      * cloud translation arrives later and REPLACES (覆盖) the local one.
      *
-     * Unlike batchTranslateAndMerge() which uses OpenAI-compatible protocol,
+     * Unlike batchTranslateAndMerge() which used OpenAI-compatible protocol,
      * MiniMax-M3 is reached via Anthropic Messages API at api.minimaxi.com/anthropic
      * with X-Api-Key header (not Authorization Bearer).
+     *
+     * Caller passes cloudBaseUrl/ApiKey/Model from settings (defaults injected
+     * from BuildConfig.MINIMAX_* so user can install APK with zero config).
      *
      * Verified 2026-09-22: M3 batch translate returns clean JSON array of
      * [english,chinese] pairs in ~1.2-2s for 3-5 segments.
      */
     suspend fun batchTranslateAndMergeCloud(
+        cloudBaseUrl: String,
+        cloudApiKey: String,
+        cloudModel: String,
         segments: List<String>
     ): List<Pair<String, String>> = withContext(Dispatchers.IO) {
-        val apiKey = com.classroom.translator.BuildConfig.MINIMAX_API_KEY
-        val baseUrl = com.classroom.translator.BuildConfig.MINIMAX_BASE_URL
-        val model = com.classroom.translator.BuildConfig.MINIMAX_MODEL
+        val apiKey = cloudApiKey
+        val baseUrl = cloudBaseUrl
+        val model = cloudModel
 
         val segmentsText = segments.mapIndexed { i, s -> "${i+1}. $s" }.joinToString("\n")
         val prompt = "You are a professional interpreter. Receive numbered ASR segments from an English lecture. " +

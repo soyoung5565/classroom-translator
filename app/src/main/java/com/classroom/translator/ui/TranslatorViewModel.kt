@@ -395,7 +395,12 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                         val recent = currentEntries.takeLast(5)
                         val segments = recent.map { it.english }
                         // Cloud path: M3 via Anthropic protocol (REPLACES local, not "corrects")
-                        val corrections = api.batchTranslateAndMergeCloud(segments)
+                        val corrections = api.batchTranslateAndMergeCloud(
+                            cloudBaseUrl = settings.cloudBaseUrl,
+                            cloudApiKey = settings.cloudApiKey,
+                            cloudModel = settings.cloudModel,
+                            segments = segments
+                        )
                         Log.i(TAG, "AI review result: ${corrections.size} items")
                         var corrected = false
                         val updated = currentEntries.toMutableList()
@@ -620,7 +625,12 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 _state.value = _state.value.copy(status = "全文修正中...")
                 val allSegments = currentEntries.map { it.english }
                 // Cloud path: M3 via Anthropic protocol
-                val corrections = api.batchTranslateAndMergeCloud(allSegments)
+                val corrections = api.batchTranslateAndMergeCloud(
+                cloudBaseUrl = _state.value.settings.cloudBaseUrl,
+                cloudApiKey = _state.value.settings.cloudApiKey,
+                cloudModel = _state.value.settings.cloudModel,
+                segments = allSegments
+            )
                 if (corrections.size == currentEntries.size) {
                     val corrected = corrections.mapIndexed { i, (en, zh) ->
                         TranslationEntryData(entries[i].timestamp, en, zh)
