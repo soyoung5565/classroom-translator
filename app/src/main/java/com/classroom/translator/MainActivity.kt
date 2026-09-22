@@ -68,5 +68,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         try { mediaProjection?.stop() } catch (_: Exception) {}
         mediaProjection = null
+        // 同步停掉内录前台服务（否则从最近任务划掉 App 后服务仍挂着）
+        ProjectionForegroundService.stop(this)
     }
 }

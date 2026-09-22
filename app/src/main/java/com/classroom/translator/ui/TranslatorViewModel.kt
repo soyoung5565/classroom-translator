@@ -227,6 +227,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                         val entry = TranslationEntry(english = text, chinese = chinese)
                         _state.value = _state.value.copy(entries = _state.value.entries + entry)
                         autoSave(entry)
+                        maybeCloudOverride()  // 双翻译：每 3 条云端覆盖
                     }
                 }
             },
@@ -384,48 +385,8 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
             autoSave(entry)
             Log.i(TAG, "Done: ${english.take(50)}... (${latency}ms)")
 
-            // 2. AI correction review (every 3 entries)
-            val currentEntries = _state.value.entries
-            if (currentEntries.size >= 3 && currentEntries.size % 3 == 0) {
-                kotlinx.coroutines.GlobalScope.launch(Dispatchers.Default) {
-                    try {
-                        Log.i(TAG, "AI review START: ${currentEntries.size} entries total")
-                        _state.value = _state.value.copy(status = "AI复盘中...")
-                        Log.i(TAG, "AI review: checking last 5 of ${currentEntries.size} entries")
-                        val recent = currentEntries.takeLast(5)
-                        val segments = recent.map { it.english }
-                        // Cloud path: M3 via Anthropic protocol (REPLACES local, not "corrects")
-                        val corrections = api.batchTranslateAndMergeCloud(
-                            cloudBaseUrl = settings.cloudBaseUrl,
-                            cloudApiKey = settings.cloudApiKey,
-                            cloudModel = settings.cloudModel,
-                            segments = segments
-                        )
-                        Log.i(TAG, "AI review result: ${corrections.size} items")
-                        var corrected = false
-                        val updated = currentEntries.toMutableList()
-                        for (i in corrections.indices) {
-                            val idx = updated.size - recent.size + i
-                            if (idx >= 0 && idx < updated.size) {
-                                val (newEn, newZh) = corrections[i]
-                                if (newEn != "[解析失败]" && newEn != "[无翻译]" && (newEn != updated[idx].english || newZh != updated[idx].chinese)) {
-                                    updated[idx] = updated[idx].copy(english = newEn, chinese = newZh, isCorrected = true)
-                                    corrected = true
-                                    Log.i(TAG, "Corrected #$idx: ${updated[idx].english.take(30)} -> ${newEn.take(30)}")
-                                }
-                            }
-                        }
-                        if (corrected) {
-                            _state.value = _state.value.copy(entries = updated, status = "已修正")
-                            delay(2000)
-                        }
-                        _state.value = _state.value.copy(status = "正在听...")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "AI review FAILED: ${e.message}", e)
-                        _state.value = _state.value.copy(status = "正在听...")
-                    }
-                }
-            }
+            // 2. 双翻译云端覆盖（每 3 条触发，云端译文后到直接替换本地）
+            maybeCloudOverride()
 
         } catch (e: Exception) {
             Log.e(TAG, "processAudio failed", e)
@@ -456,6 +417,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                         val entry = TranslationEntry(english = text, chinese = chinese)
                         _state.value = _state.value.copy(entries = _state.value.entries + entry)
                         autoSave(entry)
+                        maybeCloudOverride()  // 双翻译：每 3 条云端覆盖
                     }
                 } else {
                     // Intermediate result - show as preview
@@ -520,6 +482,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                         val entry = TranslationEntry(english = text, chinese = chinese)
                         _state.value = _state.value.copy(entries = _state.value.entries + entry)
                         autoSave(entry)
+                        maybeCloudOverride()  // 双翻译：每 3 条云端覆盖
                     }
                 }
             },
@@ -578,6 +541,11 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         try { mediaPlayer?.stop() } catch (_: Exception) {}
         try { mediaPlayer?.release() } catch (_: Exception) {}
         mediaPlayer = null
+
+        // 释放 MediaProjection + 停掉内录前台服务
+        // （之前全项目没有任何地方释放它——授权一次后前台服务永远活着，
+        //   系统持续捕获音频 = 翻译停了手机还在耗电发热，2026-09-22 发现）
+        releaseProjection()
 
         _state.value = _state.value.copy(
             isRecording = false,
@@ -823,6 +791,55 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
     }
 
 
+    /**
+     * 双翻译云端覆盖：每 3 条触发一次云端 M3 批量翻译，
+     * 云端译文后到时直接【替换】本地快翻结果（isCorrected=true 标记）。
+     * 所有流式模式（local_vllm / 测试模式 / DashScope）共用。
+     * （之前只接在 MIMO 备用模式里，流式模式从未触发过云端覆盖——2026-09-22 全面检查发现）
+     */
+    private fun maybeCloudOverride() {
+        val currentEntries = _state.value.entries
+        if (currentEntries.size < 3 || currentEntries.size % 3 != 0) return
+        val settings = _state.value.settings
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.Default) {
+            try {
+                Log.i(TAG, "Cloud override START: ${currentEntries.size} entries total")
+                _state.value = _state.value.copy(status = "云端复盘中...")
+                val recent = currentEntries.takeLast(5)
+                val segments = recent.map { it.english }
+                // Cloud path: M3 via Anthropic protocol (REPLACES local, not "corrects")
+                val corrections = api.batchTranslateAndMergeCloud(
+                    cloudBaseUrl = settings.cloudBaseUrl,
+                    cloudApiKey = settings.cloudApiKey,
+                    cloudModel = settings.cloudModel,
+                    segments = segments
+                )
+                Log.i(TAG, "Cloud override result: ${corrections.size} items")
+                var corrected = false
+                val updated = _state.value.entries.toMutableList()
+                for (i in corrections.indices) {
+                    val idx = updated.size - recent.size + i
+                    if (idx >= 0 && idx < updated.size) {
+                        val (newEn, newZh) = corrections[i]
+                        if (newEn != "[解析失败]" && newEn != "[无翻译]" && (newEn != updated[idx].english || newZh != updated[idx].chinese)) {
+                            updated[idx] = updated[idx].copy(english = newEn, chinese = newZh, isCorrected = true)
+                            corrected = true
+                            Log.i(TAG, "Override #$idx: ${updated[idx].english.take(30)} -> ${newEn.take(30)}")
+                        }
+                    }
+                }
+                if (corrected) {
+                    _state.value = _state.value.copy(entries = updated, status = "云端已覆盖")
+                    delay(2000)
+                }
+                if (_state.value.isRecording) _state.value = _state.value.copy(status = "正在听...")
+            } catch (e: Exception) {
+                Log.e(TAG, "Cloud override FAILED: ${e.message}", e)
+                if (_state.value.isRecording) _state.value = _state.value.copy(status = "正在听...")
+            }
+        }
+    }
+
     private suspend fun translateAndAdd(text: String, settings: AppSettings, startTime: Long) {
         try {
             val chinese = api.translate(baseUrl = settings.translateBaseUrl, apiKey = settings.translateApiKey,
@@ -844,9 +861,25 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: Exception) { Log.e(TAG, "Auto-save failed", e) }
     }
 
+    /** 释放 MediaProjection + 停止内录前台服务（幂等，可重复调用） */
+    private fun releaseProjection() {
+        try { mediaProjection?.stop() } catch (_: Exception) {}
+        mediaProjection = null
+        ProjectionForegroundService.stop(getApplication())
+    }
+
     override fun onCleared() {
         super.onCleared()
-        val audioPath = audioRecorder.getAudioFilePath()
+        // 全量释放：之前只停了麦克风，内录/播放器/投影/ASR 流都留在原地继续耗电
+        try { dashScopeStream?.stop() } catch (_: Exception) {}
+        dashScopeStream = null
+        try { localVllmStream?.stop() } catch (_: Exception) {}
+        localVllmStream = null
+        try { mediaPlayer?.stop() } catch (_: Exception) {}
+        try { mediaPlayer?.release() } catch (_: Exception) {}
+        mediaPlayer = null
+        try { playbackRecorder.stop() } catch (_: Exception) {}
         audioRecorder.stop()
+        releaseProjection()
     }
 }

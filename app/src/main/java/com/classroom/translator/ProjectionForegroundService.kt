@@ -37,6 +37,11 @@ class ProjectionForegroundService : Service() {
                 ready()
             }
         }
+
+        /** 停止服务（内录结束必须调用，否则前台服务永远挂着持续捕获音频） */
+        fun stop(ctx: Context) {
+            try { ctx.stopService(Intent(ctx, ProjectionForegroundService::class.java)) } catch (_: Exception) {}
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

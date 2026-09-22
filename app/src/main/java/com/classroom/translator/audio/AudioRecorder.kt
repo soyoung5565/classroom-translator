@@ -28,6 +28,10 @@ class AudioRecorder(private val context: Context) {
         const val SAMPLE_RATE = 16000
         private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
         private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
+        // pcmBuffer 只被 flush()（DashScope/MIMO 分段模式）消费；
+        // 流式模式（local_vllm）无人 flush，不设上限会无限膨胀（32KB/s）
+        // -> GC 压力 -> 发热。WAV 存档走独立文件流，清缓冲不丢录音。
+        private const val MAX_PCM_BUFFER_BYTES = 2 * 1024 * 1024  // ~64s 音频
     }
 
     private var audioRecord: AudioRecord? = null
