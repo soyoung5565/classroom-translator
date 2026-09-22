@@ -322,7 +322,7 @@ fun SettingsScreen(
 
                     var transExpanded by remember { mutableStateOf(false) }
                     val transModels = listOf(
-                        "qwen3.5-2b" to "本地 Qwen3-1.7B (当前, 0.66s)",
+                        "qwen3-1.7b" to "本地 Qwen3-1.7B (推荐, /no_think)",
                         "minimax-m3" to "MiniMax M3",
                         "kimi-k3" to "Kimi K3",
                         "glm-5.2" to "GLM 5.2",

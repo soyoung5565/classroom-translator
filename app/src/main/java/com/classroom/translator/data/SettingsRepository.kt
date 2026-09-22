@@ -20,7 +20,7 @@ data class AppSettings(
     // LLM 翻译: 切到 minimax M3
     val translateApiKey: String = "REDACTED_KEY",
     val translateBaseUrl: String = "http://127.0.0.1:8002/v1",
-    val translateModel: String = "qwen3.5-2b",
+    val translateModel: String = "qwen3-1.7b",
     // 云端翻译 (流式后覆盖 / 双端矫正): 默认值由 BuildConfig 注入 (M3 直连 minimaxi.com),
     // 用户可在设置页改 Base URL/Key/Model 切换其他 provider。
     val cloudApiKey: String = com.classroom.translator.BuildConfig.MINIMAX_API_KEY,
@@ -66,7 +66,7 @@ class SettingsRepository(private val context: Context) {
             asrModel = if (isOldAsr || rawAsrModel.isBlank()) "Qwen3-ASR" else rawAsrModel,
             translateApiKey = if (isOldTrans || rawTransKey.isBlank()) "REDACTED_KEY" else rawTransKey,
             translateBaseUrl = if (isOldTrans || rawTransUrl.isBlank()) "http://127.0.0.1:8002/v1" else rawTransUrl,
-            translateModel = if (isOldTrans || rawTransModel.isBlank()) "qwen3.5-2b" else rawTransModel,
+            translateModel = if (isOldTrans || rawTransModel.isBlank()) "qwen3-1.7b" else rawTransModel,
             // 云端覆盖默认从 BuildConfig (编译注入),用户可改
             cloudApiKey = prefs[CLOUD_API_KEY]?.takeIf { it.isNotBlank() } ?: com.classroom.translator.BuildConfig.MINIMAX_API_KEY,
             cloudBaseUrl = prefs[CLOUD_BASE_URL]?.takeIf { it.isNotBlank() } ?: com.classroom.translator.BuildConfig.MINIMAX_BASE_URL,
@@ -93,7 +93,7 @@ class SettingsRepository(private val context: Context) {
                 asrModel = prefs[ASR_MODEL] ?: "fun-asr-realtime-2026-02-28",
                 translateApiKey = prefs[TRANSLATE_API_KEY] ?: "REDACTED_KEY",
                 translateBaseUrl = prefs[TRANSLATE_BASE_URL] ?: "http://127.0.0.1:8002/v1",
-                translateModel = prefs[TRANSLATE_MODEL] ?: "qwen3.5-2b",
+                translateModel = prefs[TRANSLATE_MODEL] ?: "qwen3-1.7b",
                 cloudApiKey = prefs[CLOUD_API_KEY] ?: com.classroom.translator.BuildConfig.MINIMAX_API_KEY,
                 cloudBaseUrl = prefs[CLOUD_BASE_URL] ?: com.classroom.translator.BuildConfig.MINIMAX_BASE_URL,
                 cloudModel = prefs[CLOUD_MODEL] ?: com.classroom.translator.BuildConfig.MINIMAX_MODEL,

@@ -124,23 +124,27 @@ class OpenAiApi {
             put("messages", JSONArray().apply {
                 put(JSONObject().apply {
                     put("role", "system")
-                    put("content", "You are a professional interpreter. Translate the following $sourceLang text to $targetLang. Only output the $targetLang translation, nothing else. Keep it natural and concise.")
+                    put("content", "You are a professional interpreter. Translate the following $sourceLang text to $targetLang. ONLY output the $targetLang translation, NO thinking, NO explanation, NO preface. Output must be concise.")
                 })
                 put(JSONObject().apply {
                     put("role", "user")
                     put("content", text)
                 })
             })
-            put("max_tokens", 2000)
-            // Qwen3.x on llama.cpp: /no_think string suffix is IGNORED — the model
-            // still spends all max_tokens on thinking and returns empty content.
-            // Correct fix is chat_template_kwargs.enable_thinking=false, which
-            // llama.cpp maps to <think>...</think> removal in the Jinja template.
-            // Verified 2026-09-22 phone-side: 17s empty → 0.44-0.69s real translation.
-            if (model.contains("qwen", ignoreCase = true)) {
+            // max_tokens 800: 句子翻译不会超过这个,即使模型想 think 也装不下
+            put("max_tokens", 800)
+            // Qwen3.5+: chat_template_kwargs.enable_thinking=false 在新版 llama.cpp 有效
+            // Qwen3-1.7B 及更早: 上面 user content 末尾加 /no_think 才有效
+            // (9/22 真机测试 Qwen3.5-2B 在旧 llama-server 上仍卡,所以默认翻译模型切回 Qwen3-1.7B)
+            if (model.contains("qwen3.5", ignoreCase = true) || model.contains("qwen2", ignoreCase = true)) {
                 put("chat_template_kwargs", JSONObject().apply {
                     put("enable_thinking", false)
                 })
+            } else if (model.contains("qwen", ignoreCase = true)) {
+                // Qwen3-1.7B 等: 追加 /no_think 到 user 内容
+                val msgs = getJSONArray("messages")
+                val userMsg = msgs.getJSONObject(msgs.length() - 1)
+                userMsg.put("content", userMsg.getString("content") + "\n/no_think")
             }
         }
 
