@@ -865,7 +865,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
     private fun releaseProjection() {
         try { mediaProjection?.stop() } catch (_: Exception) {}
         mediaProjection = null
-        ProjectionForegroundService.stop(getApplication())
+        com.classroom.translator.ProjectionForegroundService.stop(getApplication<Application>())
     }
 
     override fun onCleared() {
