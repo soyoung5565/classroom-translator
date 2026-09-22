@@ -232,4 +232,80 @@ class OpenAiApi {
         }
     }
 
+    /**
+     * Batch translate via cloud MiniMax-M3 (Anthropic-compatible protocol).
+     * Used for the "cloud override" path: local translation shows first (fast),
+     * cloud translation arrives later and REPLACES (覆盖) the local one.
+     *
+     * Unlike batchTranslateAndMerge() which uses OpenAI-compatible protocol,
+     * MiniMax-M3 is reached via Anthropic Messages API at api.minimaxi.com/anthropic
+     * with X-Api-Key header (not Authorization Bearer).
+     *
+     * Verified 2026-09-22: M3 batch translate returns clean JSON array of
+     * [english,chinese] pairs in ~1.2-2s for 3-5 segments.
+     */
+    suspend fun batchTranslateAndMergeCloud(
+        segments: List<String>
+    ): List<Pair<String, String>> = withContext(Dispatchers.IO) {
+        val apiKey = com.classroom.translator.BuildConfig.MINIMAX_API_KEY
+        val baseUrl = com.classroom.translator.BuildConfig.MINIMAX_BASE_URL
+        val model = com.classroom.translator.BuildConfig.MINIMAX_MODEL
+
+        val segmentsText = segments.mapIndexed { i, s -> "${i+1}. $s" }.joinToString("\n")
+        val prompt = "You are a professional interpreter. Receive numbered ASR segments from an English lecture. " +
+            "Tasks: 1) Translate to Chinese 2) Merge consecutive incomplete sentences 3) Discard hallucinated segments " +
+            "(random words like 'yeah','okay','think' alone without context) 4) Return ONLY a JSON array of [english,chinese] pairs."
+
+        // Anthropic Messages API format
+        val payload = JSONObject().apply {
+            put("model", model)
+            put("max_tokens", 4000)
+            put("system", prompt)
+            put("messages", JSONArray().apply {
+                put(JSONObject().apply { put("role", "user"); put("content", segmentsText) })
+            })
+        }
+
+        val request = Request.Builder()
+            .url("$baseUrl/v1/messages")
+            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0")
+            .addHeader("X-Api-Key", apiKey)  // Anthropic protocol uses X-Api-Key, not Bearer
+            .addHeader("anthropic-version", "2023-06-01")
+            .addHeader("Content-Type", "application/json")
+            .post(payload.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+
+        val response = client.newCall(request).execute()
+        val body = response.body?.string() ?: throw Exception("Empty cloud response")
+        if (!response.isSuccessful) throw Exception("Cloud API error ${'$'}{response.code}: ${'$'}body")
+
+        // Anthropic response: {"content":[{"type":"text","text":"..."}], ...}
+        val json = JSONObject(body)
+        val contentArr = json.getJSONArray("content")
+        val content = StringBuilder()
+        for (i in 0 until contentArr.length()) {
+            val c = contentArr.getJSONObject(i)
+            if (c.optString("type") == "text") content.append(c.getString("text"))
+        }
+        val text = content.toString()
+
+        try {
+            val jsonStr = text.let {
+                val start = it.indexOf('[')
+                val end = it.lastIndexOf(']')
+                if (start >= 0 && end > start) it.substring(start, end + 1) else it
+            }
+            val arr = org.json.JSONArray(jsonStr)
+            val results = mutableListOf<Pair<String, String>>()
+            for (i in 0 until arr.length()) {
+                val pair = arr.getJSONArray(i)
+                if (pair.length() >= 2) results.add(Pair(pair.getString(0), pair.getString(1)))
+            }
+            results.ifEmpty { segments.map { Pair(it, "[无翻译]") } }
+        } catch (e: Exception) {
+            Log.e("OpenAiApi", "Cloud batch parse error: ${'$'}{e.message} raw: ${'$'}{text.take(200)}")
+            segments.map { Pair(it, "[解析失败]") }
+        }
+    }
+
 }

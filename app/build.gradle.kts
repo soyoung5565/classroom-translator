@@ -14,6 +14,16 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+
+        // Read MiniMax-M3 API key from local.properties (not committed)
+        val minimaxKey = providers.gradleProperty("MINIMAX_CN_API_KEY").orNull
+        buildConfigField("String", "MINIMAX_API_KEY", "\"$minimaxKey\"")
+        buildConfigField("String", "MINIMAX_BASE_URL", "\"https://api.minimaxi.com/anthropic\"")
+        buildConfigField("String", "MINIMAX_MODEL", "\"MiniMax-M3\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
@@ -34,6 +44,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
