@@ -226,8 +226,18 @@ class OpenAiApi {
             val arr = org.json.JSONArray(jsonStr)
             val results = mutableListOf<Pair<String, String>>()
             for (i in 0 until arr.length()) {
-                val pair = arr.getJSONArray(i)
-                if (pair.length() >= 2) results.add(Pair(pair.getString(0), pair.getString(1)))
+                // 兼容 ["en","zh"] 数组和 {"english":"...","chinese":"..."} 对象两种格式
+                val pair = arr.optJSONArray(i)
+                if (pair != null && pair.length() >= 2) {
+                    results.add(Pair(pair.getString(0), pair.getString(1)))
+                } else {
+                    val obj = arr.optJSONObject(i)
+                    if (obj != null) {
+                        val en = obj.optString("english").ifEmpty { obj.optString("en") }
+                        val zh = obj.optString("chinese").ifEmpty { obj.optString("zh") }
+                        if (en.isNotBlank() && zh.isNotBlank()) results.add(Pair(en, zh))
+                    }
+                }
             }
             results.ifEmpty { segments.map { Pair(it, "[无翻译]") } }
         } catch (e: Exception) {
@@ -290,7 +300,7 @@ class OpenAiApi {
 
         val response = client.newCall(request).execute()
         val body = response.body?.string() ?: throw Exception("Empty cloud response")
-        if (!response.isSuccessful) throw Exception("Cloud API error ${'$'}{response.code}: ${'$'}body")
+        if (!response.isSuccessful) throw Exception("Cloud API error ${response.code}: $body")
 
         // Anthropic response: {"content":[{"type":"text","text":"..."}], ...}
         val json = JSONObject(body)
@@ -300,7 +310,9 @@ class OpenAiApi {
             val c = contentArr.getJSONObject(i)
             if (c.optString("type") == "text") content.append(c.getString("text"))
         }
-        val text = content.toString()
+        var text = content.toString()
+        // 剥 M3 思考块泄漏 + markdown 代码围栏 (解析失败 6/32 批的常见来源)
+        text = text.replace(Regex("(?s).*?"), "").replace(Regex("```(?:json)?"), "")
 
         try {
             val jsonStr = text.let {
@@ -311,12 +323,22 @@ class OpenAiApi {
             val arr = org.json.JSONArray(jsonStr)
             val results = mutableListOf<Pair<String, String>>()
             for (i in 0 until arr.length()) {
-                val pair = arr.getJSONArray(i)
-                if (pair.length() >= 2) results.add(Pair(pair.getString(0), pair.getString(1)))
+                // 兼容 ["en","zh"] 数组和 {"english":"...","chinese":"..."} 对象两种格式
+                val pair = arr.optJSONArray(i)
+                if (pair != null && pair.length() >= 2) {
+                    results.add(Pair(pair.getString(0), pair.getString(1)))
+                } else {
+                    val obj = arr.optJSONObject(i)
+                    if (obj != null) {
+                        val en = obj.optString("english").ifEmpty { obj.optString("en") }
+                        val zh = obj.optString("chinese").ifEmpty { obj.optString("zh") }
+                        if (en.isNotBlank() && zh.isNotBlank()) results.add(Pair(en, zh))
+                    }
+                }
             }
             results.ifEmpty { segments.map { Pair(it, "[无翻译]") } }
         } catch (e: Exception) {
-            Log.e("OpenAiApi", "Cloud batch parse error: ${'$'}{e.message} raw: ${'$'}{text.take(200)}")
+            Log.e("OpenAiApi", "Cloud batch parse error: ${e.message} raw: ${text.take(300)}")
             segments.map { Pair(it, "[解析失败]") }
         }
     }

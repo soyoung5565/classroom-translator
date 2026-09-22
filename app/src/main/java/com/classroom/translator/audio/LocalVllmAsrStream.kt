@@ -94,6 +94,16 @@ class LocalVllmAsrStream(
             lastVoiceMs = now
             hasVoice = true
         }
+        // 静音保护: 纯静音缓冲超 5s 直接丢, 不发 ASR 不占内存
+        // (之前静音也会攒满 6s 被强发 -> 播完后 ASR 永续空转 = 停了还烫的元凶之一)
+        if (!hasVoice) {
+            synchronized(pcmBuffer) {
+                if (pcmBuffer.size() > SAMPLE_RATE * 2 * 5) {
+                    pcmBuffer.reset()
+                    pcmStartMs = now
+                }
+            }
+        }
     }
 
     /** VAD：当前是否检测到句末（有声音 + 静音持续 [MIN_SILENCE_MS]） */
@@ -113,6 +123,9 @@ class LocalVllmAsrStream(
 
     /** 当前是否活跃（未停止） */
     fun isActive(): Boolean = isActive
+
+    /** 当前缓冲段是否含人声（静音段不值得发给 ASR） */
+    fun hasPendingVoice(): Boolean = hasVoice
 
     /** 启动流式会话 */
     fun start() {
@@ -154,6 +167,7 @@ class LocalVllmAsrStream(
             pcmStartMs = System.currentTimeMillis()
         }
         if (pcm.size < SAMPLE_RATE / 2) return@withContext null   // 不足0.5s，忽略
+        if (!hasVoice) return@withContext null  // 无人声段不发 ASR（静音空转发热/假结果）
 
         val wav = WavEncoder.encode(pcm)  // 16k mono 16bit WAV
         val b64 = Base64.encodeToString(wav, Base64.NO_WRAP)

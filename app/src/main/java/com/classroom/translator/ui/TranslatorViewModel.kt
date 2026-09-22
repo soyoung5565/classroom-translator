@@ -84,6 +84,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
     private var mediaProjection: android.media.projection.MediaProjection? = null
     @Volatile private var pendingTestPath: String? = null
     fun setMediaProjection(mp: android.media.projection.MediaProjection?) {
+        Log.i(TAG, "setMediaProjection: mp=${mp != null} pending=$pendingTestPath vm#${hashCode()}")
         mediaProjection = mp
         // 授权就绪时，如果有待测试素材，自动启动测试
         if (mp != null) {
@@ -95,7 +96,13 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
     }
     /** 设置待测试素材并请求授权（授权回来后自动开始） */
     fun requestTestWithProjection(path: String) {
+        Log.i(TAG, "requestTestWithProjection: $path mp=${mediaProjection != null} vm#${hashCode()}")
         pendingTestPath = path
+        // 已有投影授权时直接启动（不用再走系统向导）
+        mediaProjection?.let { mp ->
+            pendingTestPath = null
+            startTestPlayback(path)
+        }
     }
     fun getPlaybackRecorder(): PlaybackCaptureRecorder = playbackRecorder
 
@@ -132,7 +139,8 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
      * 声音全程走系统内部，无需外放（音量调最小也不影响测试，不打扰周围）。
      */
     fun startTestPlayback(audioPath: String) {
-        if (_state.value.isRecording) stopRecording()
+        Log.i(TAG, "startTestPlayback: path=$audioPath mp=${mediaProjection != null} vm#${hashCode()}")
+        if (_state.value.isRecording) stopRecording(releaseProj = false)  // 只清录音, 保留刚授权的投影
         // 授权可能还在路上（用户刚点了允许，回调还没到），轮询等最多 10s
         var mp = mediaProjection
         if (mp == null) {
@@ -178,6 +186,15 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 )
                 setOnCompletionListener {
                     Log.i(TAG, "Test playback finished")
+                    // 播完自动停(留 5s 排空尾部推理)。之前播完后录音循环永续:
+                    // 静音段被 6s 超时强发给 ASR -> 空转发热 + 假结果 (2026-09-22 24.8min 测试发现)
+                    kotlinx.coroutines.GlobalScope.launch(Dispatchers.Default) {
+                        delay(5000)
+                        if (testModeActive && _state.value.isRecording) {
+                            Log.i(TAG, "Test playback finished -> auto stop")
+                            stopRecording()
+                        }
+                    }
                 }
                 prepare()
                 start()
@@ -249,7 +266,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 val stream = localVllmStream ?: break
                 val sentenceEnd = stream.isSentenceEnd()
                 // 超时兜底：累计 ≥6s 且有过声音，强制发送（防止长句无停顿永远不发）
-                val forceTimeout = stream.bufferedMs() >= 6000L && stream.bufferedMs() > 0
+                val forceTimeout = stream.bufferedMs() >= 6000L && stream.hasPendingVoice()
                 if (!sentenceEnd && !forceTimeout) continue
                 val text = try {
                     stream.transcribePending()
@@ -524,7 +541,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         Log.i(TAG, "Local vLLM streaming started")
     }
 
-    private fun stopRecording() {
+    private fun stopRecording(releaseProj: Boolean = true) {
         dashScopeStream?.stop()
         dashScopeStream = null
         localVllmStream?.stop()
@@ -545,7 +562,8 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         // 释放 MediaProjection + 停掉内录前台服务
         // （之前全项目没有任何地方释放它——授权一次后前台服务永远活着，
         //   系统持续捕获音频 = 翻译停了手机还在耗电发热，2026-09-22 发现）
-        releaseProjection()
+        // startTestPlayback 内部的自清理走 releaseProj=false, 否则会把刚授权的投影干掉
+        if (releaseProj) releaseProjection()
 
         _state.value = _state.value.copy(
             isRecording = false,
@@ -555,6 +573,12 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun startNewSession() {
+        // 有未保存条目时先存档再开新会话——之前直接清空, 测试 96 条凭空消失 (2026-09-22)
+        if (_state.value.entries.isNotEmpty()) {
+            Log.i(TAG, "startNewSession: save ${_state.value.entries.size} pending entries first")
+            finishSession()
+            return
+        }
         sessionStartTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         _state.value = _state.value.copy(entries = emptyList(), status = "就绪", error = null)
     }
