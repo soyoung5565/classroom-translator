@@ -821,7 +821,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                     val idx = updated.size - recent.size + i
                     if (idx >= 0 && idx < updated.size) {
                         val (newEn, newZh) = corrections[i]
-                        if (newEn != "[解析失败]" && newEn != "[无翻译]" && (newEn != updated[idx].english || newZh != updated[idx].chinese)) {
+                        if (newEn != "[解析失败]" && newEn != "[无翻译]" && newZh != "[解析失败]" && newZh != "[无翻译]" && (newEn != updated[idx].english || newZh != updated[idx].chinese)) {
                             updated[idx] = updated[idx].copy(english = newEn, chinese = newZh, isCorrected = true)
                             corrected = true
                             Log.i(TAG, "Override #$idx: ${updated[idx].english.take(30)} -> ${newEn.take(30)}")

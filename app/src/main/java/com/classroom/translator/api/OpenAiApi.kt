@@ -262,9 +262,12 @@ class OpenAiApi {
         val model = cloudModel
 
         val segmentsText = segments.mapIndexed { i, s -> "${i+1}. $s" }.joinToString("\n")
-        val prompt = "You are a professional interpreter. Receive numbered ASR segments from an English lecture. " +
-            "Tasks: 1) Translate to Chinese 2) Merge consecutive incomplete sentences 3) Discard hallucinated segments " +
-            "(random words like 'yeah','okay','think' alone without context) 4) Return ONLY a JSON array of [english,chinese] pairs."
+        // 严格 1:1: 调用方按位置把第 i 对覆盖到第 i 条本地译文上, 合并/丢弃会错位
+        // (2026-09-22 实测: 允许合并时 3 段只回 1 对, 只覆盖 1/3 —— 改为逐条直译)
+        val prompt = "You are a professional interpreter. Receive exactly " + segments.size + " numbered ASR segments. " +
+            "Translate EACH segment to Chinese independently. " +
+            "Return ONLY a JSON array with EXACTLY " + segments.size + " [english,chinese] pairs, " +
+            "same order and count as the input segments. Do NOT merge, do NOT drop, do NOT reorder."
 
         // Anthropic Messages API format
         val payload = JSONObject().apply {
