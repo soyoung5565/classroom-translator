@@ -241,9 +241,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                                 text = text
                             )
                         } catch (e: Exception) { "[翻译失败: ${e.message}]" }
-                        val entry = TranslationEntry(english = text, chinese = chinese)
-                        _state.value = _state.value.copy(entries = _state.value.entries + entry)
-                        autoSave(entry)
+                        addOrMergeEntry(text, chinese)
                         maybeCloudOverride()  // 双翻译：每 3 条云端覆盖
                     }
                 }
@@ -431,9 +429,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                         val chinese = try {
                             api.translate(baseUrl=settings.translateBaseUrl, apiKey=settings.translateApiKey, model=settings.translateModel, text=text)
                         } catch (e: Exception) { "[翻译失败: ${e.message}]" }
-                        val entry = TranslationEntry(english = text, chinese = chinese)
-                        _state.value = _state.value.copy(entries = _state.value.entries + entry)
-                        autoSave(entry)
+                        addOrMergeEntry(text, chinese)
                         maybeCloudOverride()  // 双翻译：每 3 条云端覆盖
                     }
                 } else {
@@ -496,9 +492,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                                 text = text
                             )
                         } catch (e: Exception) { "[翻译失败: ${e.message}]" }
-                        val entry = TranslationEntry(english = text, chinese = chinese)
-                        _state.value = _state.value.copy(entries = _state.value.entries + entry)
-                        autoSave(entry)
+                        addOrMergeEntry(text, chinese)
                         maybeCloudOverride()  // 双翻译：每 3 条云端覆盖
                     }
                 }
@@ -872,6 +866,34 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
             _state.value = _state.value.copy(entries = _state.value.entries + entry)
             autoSave(entry)
         } catch (e: Exception) { Log.e(TAG, "Merge translate failed", e) }
+    }
+
+    /**
+     * 加条目（带去重/续写合并）：
+     * - 与上一条完全相同 → 丢弃（模型重复输出）
+     * - 上一条是新条前缀（同句续写）→ 原地升级，避免重复条目
+     * 2026-09-23: 24.8min 实测出现 5 条重复条目（模型整段重发导致）。
+     */
+    private fun addOrMergeEntry(text: String, chinese: String) {
+        val entries = _state.value.entries
+        val last = entries.lastOrNull()
+        val t = text.trim()
+        when {
+            last != null && last.english.trim() == t -> {
+                Log.i(TAG, "drop duplicate entry: ${t.take(40)}")
+            }
+            last != null && last.english.trim().length >= 12 && t.startsWith(last.english.trim()) -> {
+                _state.value = _state.value.copy(
+                    entries = entries.dropLast(1) + last.copy(english = text, chinese = chinese)
+                )
+                Log.i(TAG, "merge continuation: ${t.take(40)}")
+            }
+            else -> {
+                val entry = TranslationEntry(english = text, chinese = chinese)
+                _state.value = _state.value.copy(entries = entries + entry)
+                autoSave(entry)
+            }
+        }
     }
 
     private fun autoSave(entry: TranslationEntry) {

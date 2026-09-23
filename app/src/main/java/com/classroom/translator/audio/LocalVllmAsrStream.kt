@@ -236,15 +236,7 @@ class LocalVllmAsrStream(
             // 增量提取：输出可能 = 前缀 + 增量，剥掉前缀
             val cleanedNorm = cleaned.trim()
             val prefixNorm = prefix.trim()
-            val delta: String =
-                if (prefixNorm.isNotEmpty() && cleanedNorm.startsWith(prefixNorm)) {
-                    cleanedNorm.substring(prefixNorm.length).trim()
-                } else {
-                    // 前缀没匹配（模型重写/首段无前缀）→ 若含前缀关键词则取尾部
-                    val idx = cleanedNorm.indexOf(prefixNorm.takeLast(20))
-                    if (idx >= 0) cleanedNorm.substring(idx + prefixNorm.takeLast(20).length).trim()
-                    else cleanedNorm   // 兜底：整段当增量
-                }
+            val delta: String = extractDelta(prefixNorm, cleanedNorm)
 
             // 累积全文（内存保护：只保留最近 MAX_ACCUMULATED_CHARS）
             if (delta.isNotEmpty()) {
@@ -262,6 +254,41 @@ class LocalVllmAsrStream(
             onError("识别失败: ${e.message}")
             null
         }
+    }
+
+    /**
+     * 从"前缀+增量"输出中剥出增量。
+     * 1) 精确前缀匹配
+     * 2) 词级 tail-head 对齐（模型轻微改写也能对上）
+     * 3) 字符级最长匹配片段
+     * 4) 与前缀高度重叠(>80% 词重复) 视为无新增，返回空串避免重复条目
+     * 2026-09-23: 之前固定取前缀最后 20 字符匹配，模型整段重写时兜底"整段当增量"，
+     * 24.8min 实测 104 段里 18 段整段重发、5 条重复条目。
+     */
+    internal fun extractDelta(prefixNorm: String, cleanedNorm: String): String {
+        if (prefixNorm.isEmpty()) return cleanedNorm
+        if (cleanedNorm.startsWith(prefixNorm)) return cleanedNorm.substring(prefixNorm.length).trim()
+
+        val pw = prefixNorm.split(Regex("\\s+")).filter { it.isNotEmpty() }
+        val cw = cleanedNorm.split(Regex("\\s+")).filter { it.isNotEmpty() }
+        // 2) 词级: prefix 尾部 k 词 == cleaned 开头 k 词
+        val maxK = minOf(pw.size, cw.size, 40)
+        var k = maxK
+        while (k >= 3) {
+            if (pw.takeLast(k) == cw.take(k)) return cw.drop(k).joinToString(" ").trim()
+            k--
+        }
+        // 3) 字符级: prefix 尾部最长片段在 cleaned 中出现
+        var cl = minOf(prefixNorm.length, 120)
+        while (cl >= 12) {
+            val idx = cleanedNorm.lastIndexOf(prefixNorm.takeLast(cl))
+            if (idx >= 0) return cleanedNorm.substring(idx + cl).trim()
+            cl -= 6
+        }
+        // 4) 高度重叠 => 模型重写同一段, 无新内容
+        val overlap = cw.count { it in pw }
+        if (cw.isNotEmpty() && overlap.toDouble() / cw.size > 0.8) return ""
+        return cleanedNorm
     }
 
     /** 剥离 Qwen3-ASR 输出的 language 前缀 / 特殊 token */
