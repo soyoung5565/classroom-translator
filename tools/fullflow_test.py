@@ -20,6 +20,16 @@ for line in pathlib.Path("D:/hermes-data/.env").read_text(encoding="utf-8", erro
         break
 print("M3 key:", "已加载" if M3_KEY else "缺失")
 
+def memfree_mb():
+    try:
+        out = subprocess.run([ADB, "shell", "free -m"], capture_output=True, text=True).stdout
+        for ln in out.splitlines():
+            if ln.startswith("Mem:"):
+                return int(ln.split()[3])
+    except Exception:
+        pass
+    return -1
+
 def temp():
     out = subprocess.run([ADB, "shell", "dumpsys battery | grep temperature"],
                          capture_output=True, text=True).stdout
@@ -39,6 +49,31 @@ SYS_ASR = "language English<asr_text>"
 SYS_TRANS = ("You are a professional interpreter. Translate the following English text to Chinese. "
              "ONLY output the Chinese translation, NO thinking, NO explanation, NO preface. Output must be concise.")
 
+def heal_adb():
+    """ADB 掉线自愈：重连 + 重打转发（本会话反复遇到的坑）"""
+    try:
+        subprocess.run([ADB, "reconnect", "offline"], capture_output=True, timeout=20)
+        time.sleep(2)
+        subprocess.run([ADB, "forward", "tcp:8080", "tcp:8080"], capture_output=True, timeout=20)
+        subprocess.run([ADB, "forward", "tcp:8002", "tcp:8002"], capture_output=True, timeout=20)
+        time.sleep(1)
+        return True
+    except Exception:
+        return False
+
+def post_retry(url, payload, headers=None, timeout=300, retries=3):
+    """请求失败时自愈一次并重试"""
+    last = None
+    for k in range(retries):
+        try:
+            return post(url, payload, headers=headers, timeout=timeout)
+        except Exception as e:
+            last = e
+            if k < retries - 1:
+                print(f"    [retry {k+1}] {type(e).__name__}: {str(e)[:60]} -> heal_adb()")
+                heal_adb()
+    raise last
+
 def wav_chunk(frames, rate=16000):
     b = _io.BytesIO()
     with wave.open(b, "wb") as w:
@@ -56,7 +91,7 @@ def cloud_batch(sents):
                "messages": [{"role": "user", "content": prompt}]}
     t0 = time.time()
     try:
-        dt, body = post("https://api.minimaxi.com/anthropic/v1/messages", payload,
+        dt, body = post_retry("https://api.minimaxi.com/anthropic/v1/messages", payload,
                         headers={"X-Api-Key": M3_KEY, "anthropic-version": "2023-06-01"})
         txt = "".join(c.get("text", "") for c in body.get("content", []) if isinstance(c, dict))
         txt = re.sub(r"^```(?:json)?|```$", "", txt.strip(), flags=re.M).strip()
@@ -90,7 +125,7 @@ for i in range(total_segs):
     b64 = base64.b64encode(wav_chunk(raw)).decode()
     asr_dt, asr_txt = -1, ""
     try:
-        asr_dt, body = post("http://127.0.0.1:8080/v1/chat/completions", {
+        asr_dt, body = post_retry("http://127.0.0.1:8080/v1/chat/completions", {
             "model": "Qwen3-ASR",
             "messages": [{"role": "user", "content": [
                 {"type": "text", "text": SYS_ASR},
@@ -105,7 +140,7 @@ for i in range(total_segs):
     loc_dt, loc_zh = -1, ""
     if asr_txt:
         try:
-            loc_dt, body = post("http://127.0.0.1:8002/v1/chat/completions", {
+            loc_dt, body = post_retry("http://127.0.0.1:8002/v1/chat/completions", {
                 "model": "local",
                 "messages": [{"role": "system", "content": SYS_TRANS},
                              {"role": "user", "content": asr_txt + "\\n/no_think"}],
@@ -129,8 +164,8 @@ for i in range(total_segs):
                 if zh: results[j]["zh_cloud"] = zh
 
     if (i + 1) % 10 == 0:
-        tp = temp(); temps.append(tp)
-        print(f"  seg{i+1:3d}/{total_segs} t={time.time()-t_start:5.0f}s ASR={asr_dt:4.1f}s TRANS={loc_dt:4.1f}s temp={tp}C "
+        tp = temp(); mf = memfree_mb(); temps.append((tp, mf))
+        print(f"  seg{i+1:3d}/{total_segs} t={time.time()-t_start:5.0f}s ASR={asr_dt:4.1f}s TRANS={loc_dt:4.1f}s temp={tp}C mem={mf}MB "
               f"| {asr_txt[:38]}")
 
 # 尾部剩余的也覆盖一次
@@ -164,7 +199,9 @@ print(stat(trans_lats, "本地翻译 "))
 print(stat(cloud_lats, "云端M3   "))
 print(f"云端覆盖: {cloud_cnt}/{len(results)} 条 ({cloud_cnt/max(1,len(results))*100:.0f}%)")
 print(f"ASR 与真值词级匹配: {word_acc:.1f}% ({matched}/{len(ref_words)} 词)")
-print(f"温度: {temps[0] if temps else '?'}C -> {temps[-1] if temps else '?'}C, 序列 {temps}")
+_t = [x[0] for x in temps]; _m = [x[1] for x in temps]
+print(f"温度: {_t[0] if _t else '?'}C -> {_t[-1] if _t else '?'}C, 序列 {_t}")
+print(f"可用内存: {_m[0] if _m else '?'}MB -> {_m[-1] if _m else '?'}MB, 序列 {_m}")
 print(f"{'='*70}")
 json.dump({"elapsed_min": round(el/60, 1), "segments": len(results),
            "asr_lats": [round(x,2) for x in asr_lats], "trans_lats": [round(x,2) for x in trans_lats],
