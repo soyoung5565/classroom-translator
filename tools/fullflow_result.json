@@ -1,0 +1,1576 @@
+{
+ "elapsed_min": 41.3,
+ "segments": 185,
+ "asr_lats": [
+  1.96,
+  2.21,
+  0.81,
+  2.66,
+  2.38,
+  2.96,
+  2.24,
+  2.73,
+  3.13,
+  3.09,
+  2.73,
+  3.05,
+  2.36,
+  1.79,
+  0.59,
+  0.6,
+  0.64,
+  0.48,
+  0.51,
+  0.53,
+  0.58,
+  0.54,
+  0.55,
+  0.65,
+  0.65,
+  0.6,
+  0.59,
+  0.5,
+  0.6,
+  0.52,
+  0.65,
+  0.71,
+  0.63,
+  1.02,
+  0.8,
+  0.99,
+  0.72,
+  0.64,
+  0.63,
+  0.73,
+  0.73,
+  0.72,
+  0.74,
+  0.7,
+  0.72,
+  0.73,
+  0.74,
+  0.6,
+  0.67,
+  0.49,
+  0.77,
+  0.87,
+  0.65,
+  0.64,
+  0.79,
+  0.66,
+  0.49,
+  0.59,
+  0.54,
+  0.55,
+  0.78,
+  0.58,
+  0.71,
+  0.7,
+  0.56,
+  25.87,
+  2.58,
+  2.64,
+  2.6,
+  2.6,
+  2.46,
+  2.6,
+  2.59,
+  2.73,
+  2.57,
+  2.64,
+  2.71,
+  2.6,
+  2.7,
+  2.73,
+  2.7,
+  2.52,
+  2.55,
+  2.71,
+  2.41,
+  2.6,
+  2.63,
+  2.91,
+  3.02,
+  3.12,
+  3.11,
+  2.93,
+  6.84,
+  3.28,
+  2.98,
+  3.16,
+  3.18,
+  2.81,
+  3.26,
+  16.62,
+  3.65,
+  3.09,
+  2.75,
+  2.57,
+  2.69,
+  12.46,
+  62.3,
+  15.95,
+  19.2,
+  5.44,
+  49.28,
+  34.14,
+  20.73,
+  35.35,
+  30.89,
+  16.84,
+  14.18,
+  14.83,
+  19.95,
+  15.56,
+  13.05,
+  11.08,
+  10.64,
+  16.18,
+  13.91,
+  36.12,
+  14.55,
+  15.56,
+  15.91,
+  22.65,
+  29.84,
+  25.85,
+  21.51,
+  26.59,
+  32.92,
+  14.29,
+  8.57,
+  15.13,
+  21.39,
+  18.58,
+  19.03,
+  27.61,
+  13.1,
+  9.23,
+  12.85,
+  10.9,
+  16.1,
+  17.9,
+  24.21,
+  11.98,
+  21.79,
+  19.85,
+  29.99,
+  18.79,
+  12.81,
+  18.8,
+  27.22,
+  30.75,
+  17.33,
+  12.04,
+  7.21,
+  22.87,
+  20.3,
+  14.88,
+  19.53,
+  11.69,
+  33.97,
+  61.39,
+  27.65,
+  84.01,
+  31.53,
+  13.55,
+  22.81,
+  30.86,
+  15.42,
+  21.39,
+  25.63,
+  12.77,
+  11.9,
+  21.89,
+  25.05,
+  21.9,
+  22.02,
+  16.28,
+  55.14
+ ],
+ "trans_lats": [
+  3.33,
+  5.86,
+  1.67,
+  12.77,
+  8.37,
+  16.74,
+  9.82,
+  13.88,
+  4.57,
+  9.81,
+  10.27,
+  7.05,
+  10.37,
+  3.24,
+  1.29,
+  1.54,
+  1.83,
+  1.07,
+  1.4,
+  1.71,
+  2.02,
+  0.84,
+  1.01,
+  1.47,
+  1.23,
+  1.77,
+  1.79,
+  1.59,
+  1.28,
+  1.48,
+  1.04,
+  1.3,
+  2.21,
+  1.99,
+  1.11,
+  2.08,
+  1.76,
+  1.35,
+  0.81,
+  1.23,
+  1.23,
+  1.25,
+  1.29,
+  1.23,
+  0.86,
+  1.37,
+  1.21,
+  0.63,
+  1.05,
+  0.79,
+  1.48,
+  1.15,
+  1.04,
+  1.16,
+  1.17,
+  1.01,
+  0.78,
+  1.14,
+  0.83,
+  1.0,
+  1.2,
+  1.04,
+  1.33,
+  1.19,
+  0.89,
+  1.0,
+  1.49,
+  1.02,
+  1.05,
+  1.06,
+  1.07,
+  0.99,
+  1.22,
+  1.32,
+  1.05,
+  1.06,
+  1.09,
+  1.22,
+  1.55,
+  1.31,
+  1.34,
+  0.94,
+  0.87,
+  1.26,
+  0.83,
+  0.88,
+  1.35,
+  1.47,
+  1.27,
+  1.01,
+  1.05,
+  1.03,
+  1.04,
+  1.3,
+  0.78,
+  1.12,
+  1.41,
+  0.63,
+  1.71,
+  1.41,
+  0.99,
+  1.13,
+  1.07,
+  0.96,
+  1.46,
+  1.39,
+  1.56,
+  0.99,
+  1.4,
+  0.96,
+  1.85,
+  1.72,
+  1.03,
+  1.81,
+  1.36,
+  1.66,
+  1.51,
+  1.43,
+  1.93,
+  2.85,
+  1.42,
+  1.95,
+  1.36,
+  1.5,
+  1.59,
+  2.38,
+  1.78,
+  2.35,
+  1.67,
+  2.32,
+  1.72,
+  1.99,
+  1.81,
+  1.94,
+  1.49,
+  1.46,
+  2.41,
+  1.58,
+  1.37,
+  2.59,
+  1.98,
+  1.72,
+  2.0,
+  2.28,
+  1.17,
+  1.62,
+  1.53,
+  1.6,
+  1.32,
+  1.82,
+  2.75,
+  1.68,
+  2.12,
+  2.18,
+  2.05,
+  1.33,
+  1.67,
+  1.34,
+  1.43,
+  1.82,
+  1.79,
+  2.38,
+  2.4,
+  1.5,
+  2.78,
+  2.1,
+  2.25,
+  2.11,
+  2.36,
+  2.05,
+  2.15,
+  3.14,
+  3.29,
+  2.38,
+  1.74,
+  2.2,
+  1.85,
+  2.07,
+  1.45,
+  1.6,
+  1.59,
+  3.04,
+  1.79,
+  3.09,
+  2.78
+ ],
+ "cloud_lats": [
+  1.78,
+  1.41,
+  2.4,
+  1.13,
+  1.04,
+  1.04,
+  0.98,
+  1.14,
+  1.73,
+  2.2,
+  2.32,
+  1.96,
+  4.03,
+  3.49,
+  1.19,
+  0.99,
+  0.99,
+  3.23,
+  1.04,
+  1.1,
+  1.56,
+  1.09,
+  2.18,
+  1.91,
+  1.3,
+  1.97,
+  1.19,
+  1.04,
+  1.51,
+  1.16,
+  1.15,
+  1.05,
+  2.28,
+  1.45,
+  2.37,
+  1.75,
+  1.9,
+  1.36,
+  1.89,
+  2.56,
+  1.44,
+  1.23,
+  1.7,
+  1.02,
+  0.95,
+  0.99,
+  1.18,
+  1.72,
+  1.02,
+  1.76,
+  1.4,
+  1.39,
+  1.1,
+  0.96,
+  1.07,
+  2.49,
+  2.79,
+  1.08,
+  1.27,
+  2.15,
+  1.1,
+  1.02
+ ],
+ "cloud_count": 185,
+ "word_match_pct": 91.2,
+ "temps": [
+  39.7,
+  38.9,
+  39.0,
+  39.4,
+  39.4,
+  39.9,
+  40.2,
+  40.2,
+  41.0,
+  41.4,
+  40.9,
+  40.7,
+  40.9,
+  40.6,
+  40.9,
+  41.0,
+  42.0,
+  41.4
+ ],
+ "results": [
+  {
+   "i": 1,
+   "asr": "So when you think of Singaporeans, do you feel like we are the same people? Yeah, you feel like almost like meeting a Malaysian, but.",
+   "zh_local": "当你说起新加坡人，你会觉得我们是同一个人吗？是的，你感觉像是几乎遇见了马来西亚人，但。",
+   "zh_cloud": "所以当你想到新加坡人的时候，你是否觉得我们是同一类人？是的，你感觉几乎像是遇见马来西亚人，但是。"
+  },
+  {
+   "i": 2,
+   "asr": "Ah, slightly richer. The people's are same, but the thinking of the Singaporean is different. So I think they have this perception.",
+   "zh_local": "新加坡人有不同看法，但人们相同。",
+   "zh_cloud": "啊，稍微更富有一点。人民是一样的，但是新加坡人的思维方式不同。所以我认为他们有这种观念。"
+  },
+  {
+   "i": 3,
+   "asr": "That they are better, you know, that this general perception that you know obviously they are better than Malaysians. Hey everybody.",
+   "zh_local": "他们更优秀，你知道的，这个普遍的观念。Hey everyone.",
+   "zh_cloud": "就是他们更优越，你知道的，就是这种普遍的观念，就是你知道的，显然他们比马来西亚人更优越。大家好。"
+  },
+  {
+   "i": 4,
+   "asr": "Here at Asian Bus, we strive to bring you the most authentic hyperlocal insights from Asia, straight from real people's voices.",
+   "zh_local": "这里是亚洲巴士，旨在为您呈现来自亚洲的最真实、本地化的人声反馈。",
+   "zh_cloud": "在Asian Bus，我们致力于为您提供来自亚洲最真实的本地化见解，直接来自真实民众的声音。"
+  },
+  {
+   "i": 5,
+   "asr": "And today we're super excited to bring you our first street interview from Malaysia, a country that's rarely covered.",
+   "zh_local": "马来西亚今日首次街头访谈",
+   "zh_cloud": "今天我们非常兴奋地为您带来我们的第一期来自马来西亚的街头采访，这是一个很少被报道的国家。"
+  },
+  {
+   "i": 6,
+   "asr": "By international media. Before we hit the streets of Kuala Lumpur, a quick shout out to our partner Give Asia. Give Asia is a kindness platform.",
+   "zh_local": "由国际媒体。在我们抵达清马尼西亚前，向我们的合作伙伴Give Asia致以简短的问候。Give Asia是爱心平台。",
+   "zh_cloud": "被国际媒体所报道。在我们走上吉隆坡街头之前，先向我们的合作伙伴Give Asia致以诚挚的问候。Give Asia是一个善意平台。"
+  },
+  {
+   "i": 7,
+   "asr": "Based in Singapore, that inspires acts of kindness by empowering people to donate, volunteer, and support.",
+   "zh_local": "新加坡，激励人们通过鼓励捐赠、志愿服务和支持。",
+   "zh_cloud": "总部位于新加坡，通过赋能人们捐赠、志愿服务和提供支持来激发善行。"
+  },
+  {
+   "i": 8,
+   "asr": "Meaningful causes. We've even been collaborating to alleviate poverty in Malaysia. Check out our recent documentary with Gav Asia.",
+   "zh_local": "意义来源。我们已与马来西亚合作解决贫困问题。查看我们的近期与Gav Asia合作的纪录片。",
+   "zh_cloud": "有意义的事业。我们甚至一直在合作缓解马来西亚的贫困问题。来看看我们与Gav Asia合作的最新纪录片吧。"
+  },
+  {
+   "i": 9,
+   "asr": "Where we shed a light on child malnourishment in Malaysia and helped a single mum struggling to feed her five children, we surprised her.",
+   "zh_local": "马来西亚儿童营养不良问题，帮助一位单亲妈妈照顾五名孩子，我们令人惊讶。",
+   "zh_cloud": "纪录片聚焦了马来西亚儿童营养不良的问题，并帮助了一位艰难抚养五个孩子的单亲妈妈，我们给了她一个惊喜。"
+  },
+  {
+   "i": 10,
+   "asr": "With fortified milk and extra support to help her kids, but so many families like hers still need immediate help. We're aiming to provide.",
+   "zh_local": "我们希望为她们提供帮助。",
+   "zh_cloud": "有了强化牛奶和额外支持来帮助她的孩子们，但仍有太多像她这样的家庭需要立即援助，这正是我们致力提供的。"
+  },
+  {
+   "i": 11,
+   "asr": "Forty-five mil for five hundred children for six months, and you can support by making a small donation or simply sharing the campaign.",
+   "zh_local": "45万支持500名儿童，为期六个月，可捐赠或分享活动。",
+   "zh_cloud": "四十五万用于在六个月内帮助五百名儿童，您可以通过小额捐款或仅仅分享此活动来提供支持。"
+  },
+  {
+   "i": 12,
+   "asr": "Check out the latest campaign we're supporting in the description below, and see how we can all help make the world a kinder place.",
+   "zh_local": "查看下方描述中的最新活动，了解我们如何帮助世界变得更善良。",
+   "zh_cloud": "查看我们在下方简介中正在支持的最新活动，看看我们大家如何能帮助让世界变得更加温暖善良。"
+  },
+  {
+   "i": 13,
+   "asr": "Together, we can make a difference as a community. Now let's go to our reporter in Kuala Lumpur.",
+   "zh_local": "我们社区可以共创改变。现在让我们前往马来西亚的记者。",
+   "zh_cloud": "只要我们团结一心，作为一个集体就能有所作为。现在让我们连线在吉隆坡的记者。"
+  },
+  {
+   "i": 14,
+   "asr": "The first thing that comes to your mind when you think about Singapore, Singapore is good, clean. No good food.",
+   "zh_local": "新加坡首要是好、干净。",
+   "zh_cloud": "一想到新加坡，你脑海中首先浮现的就是，新加坡很好、很干净。没有什么好吃的。"
+  },
+  {
+   "i": 15,
+   "asr": "Compared to Malaysia, I think Singapore has a better economy, and it is.",
+   "zh_local": "新加坡比马来西亚经济更好，它。",
+   "zh_cloud": "与马来西亚相比，我认为新加坡的经济更好，确实如此。"
+  },
+  {
+   "i": 16,
+   "asr": "Always, ah, more advanced in terms of the technology and also the job, ah, the job itself lah.",
+   "zh_local": "技术更先进，职业本身也更优秀。",
+   "zh_cloud": "一直以来，啊，技术方面更先进，工作方面也是，啊，工作本身啦。"
+  },
+  {
+   "i": 17,
+   "asr": "Thing that comes to my mind is that Singapore is a small country, but even though it's small, it's super developed and the.",
+   "zh_local": "新加坡是一个小国家，尽管如此，它却非常发达。",
+   "zh_cloud": "我想到的就是新加坡是一个小国家，但尽管它很小，它却非常发达，而且。"
+  },
+  {
+   "i": 18,
+   "asr": "Transportation there is pretty good public transportation. Everywhere is very clean, and they don't allow chewing.",
+   "zh_local": "这里公共交通良好，处处干净整洁，禁止嚼口香糖。",
+   "zh_cloud": "那里的公共交通相当不错。到处都很干净，而且他们不允许嚼口香糖。"
+  },
+  {
+   "i": 19,
+   "asr": "Gums, like this stereotype is: they always think that their food is better than ours.",
+   "zh_local": "他们总是认为自己的食物比我们的更好。",
+   "zh_cloud": "加马族就像这个刻板印象一样，他们总是觉得自己的食物比我们的好。"
+  },
+  {
+   "i": 20,
+   "asr": "In reality, in reality, is they need to come here more to taste our food. The difference in our.",
+   "zh_local": "他们需要更多地来品尝我们的食物，这给我们带来了差异。",
+   "zh_cloud": "事实上，事实上，是他们需要更多地来这里品尝我们的食物。我们的差异在于。"
+  },
+  {
+   "i": 21,
+   "asr": "Currency: the Singapore dollar is much higher than our Malaysian ringgit. So when we go there, we have a.",
+   "zh_local": "马来西亚盾比我们所用的货币高。所以，当我们前往那里时，我们有。",
+   "zh_cloud": "货币：新币比我们的马来西亚林吉特高很多。所以当我们去那里的时候，我们会有一个。"
+  },
+  {
+   "i": 22,
+   "asr": "Issue with spending as much as we would like to. What would be some common stereotypes that Malaysian?",
+   "zh_local": "马来西亚的常见偏见",
+   "zh_cloud": "在尽可能多的消费方面存在问题。关于马来西亚人,会有哪些常见的刻板印象呢?"
+  },
+  {
+   "i": 23,
+   "asr": "Have about Singapore Singaporeans, any stereotype like? Yeah, okay, they're very rich because their currency is so.",
+   "zh_local": "新加坡人，他们的货币非常丰富。",
+   "zh_cloud": "对新加坡和新加坡人有什么看法,有什么刻板印象吗?是的,好的,他们非常富有,因为他们的货币非常……"
+  },
+  {
+   "i": 24,
+   "asr": "They're very rich, they're very hardworking, and it's a land of opportunity. When the Singaporean come to the Malaysia.",
+   "zh_local": "新加坡人来到马来西亚。",
+   "zh_cloud": "他们非常富有,他们非常勤奋,而且那是一个充满机会的地方。当新加坡人来马来西亚的时候。"
+  },
+  {
+   "i": 25,
+   "asr": "They have become more, you know, because in the in Singapore, there are very strict rules. But when they come to Malaysia,",
+   "zh_local": "他们在新加坡变得越来越严苛，因为在那里有非常严格的规则。",
+   "zh_cloud": "他们变得更加，你知道，因为在新加坡，有非常严格的规则。但是当他们来到马来西亚的时候，"
+  },
+  {
+   "i": 26,
+   "asr": "Yeah, become more wise. Have you actually been to Singapore before? Uh, I think twice, twice, yeah.",
+   "zh_local": "是的，变得更明智。你有没有去过新加坡？嗯，我确实去过两次，嗯。",
+   "zh_cloud": "是的，变得更聪明了。你之前真的去过新加坡吗？嗯，我想去过两次，两次，是的。"
+  },
+  {
+   "i": 27,
+   "asr": "And in your opinion, how different is Singapore from Malaysia? Ah, okay. So I feel like it's like.",
+   "zh_local": "新加坡与马来西亚之间有何不同？哦，好，我感觉就像...",
+   "zh_cloud": "那么在你看来，新加坡和马来西亚有多不同？啊，好的。所以我觉得就像是。"
+  },
+  {
+   "i": 28,
+   "asr": "But more structured and more regulated. Yeah, that's how I feel about Singapore.",
+   "zh_local": "但更结构化、更规范。嗯，我感觉新加坡就是这样。",
+   "zh_cloud": "但更有条理，监管也更严格。是的，这就是我对新加坡的感受。"
+  },
+  {
+   "i": 29,
+   "asr": "I've lived in Singapore, studied there, and worked there, and from what people tell me, they think that Malaysians are.",
+   "zh_local": "马来人",
+   "zh_cloud": "我在新加坡生活过，在那里学习过，也在那里工作过，从人们告诉我的来看，他们觉得马来西亚人是。"
+  },
+  {
+   "i": 30,
+   "asr": "Way friendlier and warmer, as people, Singaporeans tend to be a bit more. I think.",
+   "zh_local": "新加坡人更友好温暖，人们倾向这样。",
+   "zh_cloud": "更友好、更热情，作为新加坡人则倾向于稍微，我觉得。"
+  },
+  {
+   "i": 31,
+   "asr": "Um, not as reserved. I think they have this perception that they are better, you know, that this general.",
+   "zh_local": "他们有这种认知，认为自己更好。",
+   "zh_cloud": "嗯，没有那么内敛。我觉得他们有一种感觉，觉得自己更优越，你懂的，那种普遍的。"
+  },
+  {
+   "i": 32,
+   "asr": "Perception that you know obviously they are better than Malaysians, but working in Singapore and dealing with Singaporeans and people from all over the world.",
+   "zh_local": "你确信这些人在新加坡表现更好，但与新加坡人及全球各地的人打交道。",
+   "zh_cloud": "感觉，就是他们觉得自己显然比马来西亚人更优越，但是在新加坡工作，和新加坡人以及来自世界各地的人打交道的时候。"
+  },
+  {
+   "i": 33,
+   "asr": "They think Malaysians are nicer. When you are in Singapore and the locals find out that you're from Malaysia, how do they?",
+   "zh_local": "他们认为马来西亚人更友好。当你在新加坡并与当地居民得知你来自马来西亚时，他们如何反应？",
+   "zh_cloud": "他们觉得马来西亚人更好相处。当你在新加坡，当当地人发现你是马来西亚人的时候，他们会怎么样？"
+  },
+  {
+   "i": 34,
+   "asr": "They react like, \"How's their behavior?\" They go like, \"Oh, you're from Malaysia, no wonder,\" you know they go, and then I'm like, \"What do you mean, no wonder?\"",
+   "zh_local": "他们像“他们的行为怎么样？”那样回答，他们又像“你是马来西亚人，自然如此”那样回答，我则像“你说的意思，当然如此？”那样回应。",
+   "zh_cloud": "他们会反应说，“他们的行为怎么样？”他们会说，“哦，你来自马来西亚，难怪，”你知道他们会说，然后我会说，“你是什么意思，难怪？”"
+  },
+  {
+   "i": 35,
+   "asr": "And I said, \"No, it's the way you speak, it's the way you, um, be with people, and and just just the energy.\"",
+   "zh_local": "“不，是你的说话方式，是你的和人相处的方式，还有能量。”",
+   "zh_cloud": "然后我说，“不是，是你说英语的方式，是你，呃，跟人相处的方式，还有就是，就是那种能量。”"
+  },
+  {
+   "i": 36,
+   "asr": "G is different, you know. Like they could tell, and then they go like, \"Oh, no wonder from Malaysia,\" you know. They they do, they give me this kind of. So so they can actually.",
+   "zh_local": "G不同，你知道。他们可能已经知道，然后他们说：“哦，难怪从马来西亚这里来的。”他们这样做，然后他们可以说。所以他们实际上可以做到。",
+   "zh_cloud": "G不一样，你知道。就像他们能看出来，然后他们会说，“哦，难怪来自马来西亚，”你知道。他们确实会，他们给我这种感觉。所以所以他们其实能看出来。"
+  },
+  {
+   "i": 37,
+   "asr": "Tell that you're from Malaysia. Yeah, yeah, yeah. Yeah, and probably the way I speak also like my Malay is obviously better. They cannot maybe.",
+   "zh_local": "我是马来西亚人。是的，是的，是的。而且我可能的表达方式也跟我的马来语更接近，他们难以做到。",
+   "zh_cloud": "告诉他们你来自马来西亚。是的，是的，是的。是的，可能我的说话方式，而且我的马来语显然更好。他们可能不行。"
+  },
+  {
+   "i": 38,
+   "asr": "So I think because the fact that I could speak very fluent Malay, and then they go like, \"Oh, from Malaysia, right?\"",
+   "zh_local": "我想到因为我能流利地使用马来语，然后他们问我：“哦，来自马来西亚的对吧？”",
+   "zh_cloud": "所以我认为，正因为我可以说非常流利的马来语，然后他们就会说，‘哦，来自马来西亚，对吧？’"
+  },
+  {
+   "i": 39,
+   "asr": "Yeah. When you're in Singapore and the locals find out that you're from Malaysia, how do they actually react?",
+   "zh_local": "新加坡本地人会怎样反应？",
+   "zh_cloud": "是的，当你在新加坡，当当地人发现你来自马来西亚时，他们实际上会有什么反应？"
+  },
+  {
+   "i": 40,
+   "asr": "Uh, they were friendly actually, and also some. I think most of the Malays there can speak Malay well. So I think.",
+   "zh_local": "他们确实很友好，而且一些马来人能够很好地用马来语交流。所以我觉得这没错。",
+   "zh_cloud": "呃，他们其实挺友好的，而且有些人。我记得那里的大多数马来人都能说马来语。所以我觉得。"
+  },
+  {
+   "i": 41,
+   "asr": "I think that's not difficult for Malaysian being there. And also, most of them speak Chinese, and most of them has Malay.",
+   "zh_local": "马来西亚人来这里并不困难。大多数人都会说中文，大多数人都以马来语为母语。",
+   "zh_cloud": "我觉得对马来西亚人来说，在那里并不困难。而且，他们大多数人都会说中文，大多数人也会说马来语。"
+  },
+  {
+   "i": 42,
+   "asr": "They dialect like lah and na, you know. Yeah, then, correct. Can they even tell you that you're Singaporean or?",
+   "zh_local": "他们用 Lah 和 Na 的方言，你知道对吧。那么，他们是否能告诉你我是新加坡人？",
+   "zh_cloud": "他们的方言里有 lah 和 na 这种语气词，你知道的。是啊，那他们能不能听出来你是新加坡人呢？"
+  },
+  {
+   "i": 43,
+   "asr": "Ah, they could guess me as Malaysian. Oh, okay, they can. I don't feel like I belong there. Like.",
+   "zh_local": "他们可能猜到我是马来人。哦，好吧，他们可以。我感觉这里不太像我的地方。",
+   "zh_cloud": "啊，他们能猜出我是马来西亚人。哦，好吧，他们可以。我不觉得自己属于那里。就像。"
+  },
+  {
+   "i": 44,
+   "asr": "Not much, ah, smiles you know coming from them. Um, yeah, I mean they are just like very busy.",
+   "zh_local": "不多，啊，你从他们那边过来时笑了。嗯，是的，他们其实很忙。",
+   "zh_cloud": "笑容不多，你知道，从他们那里来的。嗯，是的，我是说他们就是非常忙。"
+  },
+  {
+   "i": 45,
+   "asr": "Just mining their own business, and you know. First of all, when I speak, they don't know that I am Malay.",
+   "zh_local": "我并不了解你所说的。",
+   "zh_cloud": "各自忙自己的事，你知道。首先，我说话的时候，他们不知道我是马来人。"
+  },
+  {
+   "i": 46,
+   "asr": "Because we have the same accent, but when they find out that I'm Malaysian, I am always accepted, and of course I always.",
+   "zh_local": "因为我和他们一样有相同的发音，当他们发现我是马来西亚人时，我总是被接受，当然我也总是这样。",
+   "zh_cloud": "因为我们有相同的口音，但当他们发现我是马来西亚人时，我总是被接受，当然我也总是如此。"
+  },
+  {
+   "i": 47,
+   "asr": "To uphold my Malaysian identity, but they always accept me, and I blend in very well. Okay, now we're going to get slightly.",
+   "zh_local": "我 Malaysian 的认同，但他们总是接受我，我融入得很好。现在我们稍作。",
+   "zh_cloud": "为了维护我马来西亚人的身份，但他们总是接纳我，而且我融入得很好。好的，现在我们要稍微进入……"
+  },
+  {
+   "i": 48,
+   "asr": "Which country has better food, Singapore or Malaysia? Okay, now I'm going to be very.",
+   "zh_local": "马来西亚。",
+   "zh_cloud": "哪个国家的食物更好，新加坡还是马来西亚？好的，现在我要非常……"
+  },
+  {
+   "i": 49,
+   "asr": "Patriotic here. I like Malaysian food. I am an advocate of my country, Malaysia's food, although we.",
+   "zh_local": "马来西亚人。我喜欢马来西亚的美食。我是马来西亚人民的倡导者。",
+   "zh_cloud": "我热爱我的祖国。我喜欢马来西亚菜。我是马来西亚菜的拥护者，虽然我们……"
+  },
+  {
+   "i": 50,
+   "asr": "We have the same thing in Singapore, but I think ours is a notch better.",
+   "zh_local": "我们一样在新加坡，但我们的水平更好。",
+   "zh_cloud": "新加坡也有同样的食物，但我认为我们的略胜一筹。"
+  },
+  {
+   "i": 51,
+   "asr": "The food, like different, like. I I don't know. Probably it's it's the preparation. I've had very good food in Singapore.",
+   "zh_local": "新加坡的餐食，就像其他食物一样，我可能不知道。大概它就是准备的过程。我曾在新加坡吃过非常好的餐食。",
+   "zh_cloud": "这食物，感觉不一样。我，我不知道。可能是制作方式吧。我在新加坡也吃过非常好的食物。"
+  },
+  {
+   "i": 52,
+   "asr": "Poor, I've had very good food, but somehow you know we know the best places. Being Malaysian, we know the best places here. Of course, Malaysia.",
+   "zh_local": "我们知道马来西亚的最好地方。当然，马来西亚。",
+   "zh_cloud": "可怜，我吃过非常棒的食物，但不知怎么的，你知道我们知道最好的地方。作为马来西亚人，我们知道这里最好的地方。当然，马来西亚。"
+  },
+  {
+   "i": 53,
+   "asr": "Okay, and why is that? Because Malaysia is, for me personally, because we have diverse people here, like Indian.",
+   "zh_local": "因为马来西亚对我来说，是因为这里的人很多样，像印度人。",
+   "zh_cloud": "好的，为什么呢？因为马来西亚对我来说，因为这里有不同种族的人，比如印度人。"
+  },
+  {
+   "i": 54,
+   "asr": "From Borneo, Sarawak, and Sabah also, so we have like many many types of foods rather than.",
+   "zh_local": "从马来亚、砂亚和萨巴地区，我们还包括像许多许多种类的食物。",
+   "zh_cloud": "还有来自婆罗洲、沙捞越和沙巴的，所以我们有很多很多不同种类的食物。"
+  },
+  {
+   "i": 55,
+   "asr": "And Singapore, but Singapore food is so good. Like, ah, I'll I'll not say Singapore food is not okay, but I think Malaysia food is.",
+   "zh_local": "新加坡美食如此出色，像我一样，会说马来西亚也好吃。",
+   "zh_cloud": "还有新加坡，但新加坡的食物很好吃。嗯，我不会说新加坡的食物不好，但我觉得马来西亚的更好。"
+  },
+  {
+   "i": 56,
+   "asr": "Has more in Namibian, correct, correct. And what do you? What makes the food in Singapore different from?",
+   "zh_local": "正确，新加坡的饮食与纳米比亚的饮食有何不同？",
+   "zh_cloud": "更多在纳米比亚，对，对。那你觉得呢？新加坡的食物和有什么不同？"
+  },
+  {
+   "i": 57,
+   "asr": "Malaysia, I think, Malaysian food is mostly here are traditional food.",
+   "zh_local": "马来西亚，我认为马来西亚的美食主要是传统食物。",
+   "zh_cloud": "马来西亚，我认为，马来西亚的食物大多是传统食物。"
+  },
+  {
+   "i": 58,
+   "asr": "They cannot be found in most area in like urban or city area. I think because I had.",
+   "zh_local": "他们无法在大部分地区找到，特别是在如城市或市中心地区。我认为是因为我曾在那里。",
+   "zh_cloud": "在大多数地区是找不到的，比如城市或市区。我觉得是因为我有过。"
+  },
+  {
+   "i": 59,
+   "asr": "Some of the Singaporean food, and I think that Malaysia has an advantage in terms.",
+   "zh_local": "新加坡美食，我认为马来西亚在某些方面有优势。",
+   "zh_cloud": "一些新加坡的食物，我觉得马来西亚在方面有优势。"
+  },
+  {
+   "i": 60,
+   "asr": "Of the spice lah, spice and the herbs. Compared to the Singapore, I do think like.",
+   "zh_local": "香料和香料的混合，与新加坡相比，我感觉更相似。",
+   "zh_cloud": "就是香料啦，香料和香草。与新加坡相比，我确实觉得吧。"
+  },
+  {
+   "i": 61,
+   "asr": "Ah, some Singaporean food is quite delicious. Okay, roo tchennai better here or there. Ah, here. Ttare.",
+   "zh_local": "有些新加坡食品非常美味，这里罗汉尼更好吃，或者那里更好。",
+   "zh_cloud": "啊，一些新加坡的食物相当美味。好啦，roo tchennai 这边还是那边好。啊，这边。Ttare。"
+  },
+  {
+   "i": 62,
+   "asr": "Did not hear. Which country food is better, Singapore or Malaysia? It's not biased, but honestly.",
+   "zh_local": "新加坡美食还是马来西亚美食？不偏不倚，实话实说。",
+   "zh_cloud": "没听清。哪个国家的食物更好，新加坡还是马来西亚？这不是偏心，但老实说。"
+  },
+  {
+   "i": 63,
+   "asr": "One because I never go to Singapore and try exactly the food, and I am so born here, and of course I choose Malaysia better lah.",
+   "zh_local": "我因为从未去过新加坡尝试过如此美味的食物，而我在这里出生，并且一定选择马来西亚更好。",
+   "zh_cloud": "一是因为我从来没去过新加坡真正尝过那里的食物，而且我生在这里，所以我当然选马来西亚更好啦。"
+  },
+  {
+   "i": 64,
+   "asr": "Okay. And what makes Malaysian food in your opinion better? Like why? One is a lot of variation. We have.",
+   "zh_local": "马来西亚美食在你的看法中更受欢迎的原因是什么？比如，有很多变数。我们有。",
+   "zh_cloud": "好的。 那你觉得马来西亚菜为什么更好吃？ 为什么？ 一个是种类很多。 我们有。"
+  },
+  {
+   "i": 65,
+   "asr": "Of Indian food, Malay food, Chinese food, more, more, what's it, more options.",
+   "zh_local": "印度菜、马来菜、中国菜，更多选项。",
+   "zh_cloud": "印度菜、 马来菜、 中餐， 还有， 还有， 怎么说， 还有更多的选择。"
+  },
+  {
+   "i": 66,
+   "asr": "I think more options. It's more spicy. So when you think of Singaporeans, do you feel like we are the same people?",
+   "zh_local": "新加坡人，我更觉得我们是同一个人。",
+   "zh_cloud": "我觉得选择更多。 菜也更辣。 那当你想到新加坡人的时候， 会不会觉得我们是同一种人？"
+  },
+  {
+   "i": 67,
+   "asr": "Or like the distant cousins or something, or do you see them as totally different people from totally different country? Like, how much is?",
+   "zh_local": "或像遥远的亲戚或某种东西，你觉得他们是完全不同的国家的人吗？或者说，你看到他们就像完全不同的国家吗？有多少？",
+   "zh_cloud": "还是像那种远房表亲之类的，还是你觉得他们是完全来自另一个国家、截然不同的人？比如，有多少是？"
+  },
+  {
+   "i": 68,
+   "asr": "The similarity, or do you feel it? It's totally different. It's totally different. You're not same. And and why is that?",
+   "zh_local": "你感觉相似吗？完全不同。你不是一样的。",
+   "zh_cloud": "相似性，还是你能感觉到？完全不一样。完全不一样。你们不是同一种。那为什么呢？"
+  },
+  {
+   "i": 69,
+   "asr": "It's Malaysian. It's Malaysian. Singapore is a Singaporean. That's so. I don't have any ideas comparing them.",
+   "zh_local": "马来西亚。新加坡是新加坡人。我毫无想法比较他们。",
+   "zh_cloud": "那是马来西亚的。马来西亚的。新加坡就是新加坡人。就是这样的。我没有任何想法去比较他们。"
+  },
+  {
+   "i": 70,
+   "asr": "Simulation in Singapore, but the culture is same. The people is same, but the thinking of the Singaporeans is different.",
+   "zh_local": "新加坡模拟，文化相同，人相同，但新加坡人思维方式不同。",
+   "zh_cloud": "虽然是在新加坡的模拟，但文化是一样的。人是一样的，但新加坡人的思维方式不同。"
+  },
+  {
+   "i": 71,
+   "asr": "Yeah, you feel like almost like meeting a Malaysian, but slightly richer, slightly richer, and.",
+   "zh_local": "你感觉像遇到了马来西亚人，但稍有富足，稍有富足。",
+   "zh_cloud": "是的，你感觉几乎就像遇到一个马来西亚人，但稍微有钱一点，稍微有钱一点，而且。"
+  },
+  {
+   "i": 72,
+   "asr": "Um, I'm not sure like how they, ah, like ah because it's ah, it's relative to small country so.",
+   "zh_local": "我不确定，因为它是相对小国家而来的。",
+   "zh_cloud": "呃，我不太确定他们怎么样，啊，因为啊，因为它是啊，它是相对于一个小国家所以。"
+  },
+  {
+   "i": 73,
+   "asr": "They always come here as a tourists. Yeah, they they just look like almost like Malaysian. Yeah, if if you if you.",
+   "zh_local": "他们总来这儿当游客。嗯，他们看起来几乎像马来西亚人。嗯，如果……",
+   "zh_cloud": "他们总是以游客的身份来这里。是的，他们看起来几乎像马来西亚人。是的,如果,如果你的话。"
+  },
+  {
+   "i": 74,
+   "asr": "If you don't see them shaking the car in the petrol station, yeah, probably you know you don't know they are Singaporean. Okay, that's okay.",
+   "zh_local": "如果你没看到车辆在加油站摇晃，那可能说明你没意识到他们来自新加坡。",
+   "zh_cloud": "如果你没有看到他们在加油站摇晃汽车,是的,可能你不知道他们是新加坡人。好的,那没关系。"
+  },
+  {
+   "i": 75,
+   "asr": "I do look at them from different country. I look at them Singaporeans as, like I said before, as siblings.",
+   "zh_local": "我从不同国家看这些地方。我将他们视作兄弟姐妹。",
+   "zh_cloud": "我确实从不同的国家看他们。我看待新加坡人,就像我之前说的,就像兄弟姐妹一样。"
+  },
+  {
+   "i": 76,
+   "asr": "As a family, I mean, if someone visits Singapore, of course, and it is not someone from the South East Asia, of course.",
+   "zh_local": "作为家庭，如果有人来访，当然不是来自东南亚洲。",
+   "zh_cloud": "作为一个家庭，我的意思是，如果有人来新加坡，当然，前提是不是来自东南亚的人，当然。"
+  },
+  {
+   "i": 77,
+   "asr": "Because we all would try, and be married to that person rather than us being married as Singapore. I mean, it's kind of a united kind of a.",
+   "zh_local": "我们都会去尝试，而非彼此成为新加坡人。",
+   "zh_cloud": "因为我们都会努力，嫁给那个人，而不是我们作为新加坡人结婚。我的意思是，这是一种团结的。"
+  },
+  {
+   "i": 78,
+   "asr": "Think if you've seen it before, yeah. Um, maybe cousins, yeah, like you know, my uncle is working there.",
+   "zh_local": "你记得吗？是的，可能是你认识的亲戚，比如你的叔叔正在那里工作。",
+   "zh_cloud": "想想你以前是否见过，是的。嗯，也许表亲，是的，就像你知道的那样，我的叔叔在那里工作。"
+  },
+  {
+   "i": 79,
+   "asr": "Oh, yeah, it's quite close, really close to Johor. Now I see them as somebody that same—we share the same culture, we share.",
+   "zh_local": "嗯，是的，确实很接近吉罗。我认出了他们，他们是同一个人，我们共享文化。",
+   "zh_cloud": "嗯，是的，很近，离柔佛真的很近。现在我把他们看作和我们一样——我们共享相同的文化，我们共享。"
+  },
+  {
+   "i": 80,
+   "asr": "We're the same. We look the same, you know, like we're the same people, you know, but it's just that there's been this vast.",
+   "zh_local": "我们是一样的。我们看起来相同，就像我们是同一人，但只是这么简单。",
+   "zh_cloud": "我们是一样的。我们看起来也一样，你知道，就像是同样的人，你知道，只是曾经有过这片广阔的……"
+  },
+  {
+   "i": 81,
+   "asr": "It's like differences between all Singaporeans here and Malaysians here, but to me we're all the same people. You know, it's still still.",
+   "zh_local": "这里的人有新加坡人和马来西亚人，但我是所有同乡。你明白，他们是同一个人。",
+   "zh_cloud": "就像是这里所有新加坡人和这里所有马来西亚人之间的差异，但对我来说我们都是一样的人。你知道，仍然还是。"
+  },
+  {
+   "i": 82,
+   "asr": "Feels home just a little bit more advanced as a country. Whenever I see Singaporeans, I, I, I.",
+   "zh_local": "新加坡人让我感到有点家的感觉。",
+   "zh_cloud": "感觉作为一个国家，新加坡稍微更先进一些。每当我看到新加坡人时，我，我，我。"
+  },
+  {
+   "i": 83,
+   "asr": "Think that they are one of us. distant cousins, one of us. We were one country at one time.",
+   "zh_local": "我们是同一家的远亲。",
+   "zh_cloud": "觉得他们是我们中的一员。远房表亲，是我们中的一员。我们曾经是一个国家。"
+  },
+  {
+   "i": 84,
+   "asr": "So, you know, we speak the same languages, our culture is the same, we can relate very well to each other. In your view, what's?",
+   "zh_local": "我们可以说同一语言，我们的文化相同，彼此间关系深厚。你的看法是什么？",
+   "zh_cloud": "所以，你知道，我们说着相同的语言，我们的文化是相同的，我们能够很好地理解彼此。在你看来，什么是？"
+  },
+  {
+   "i": 85,
+   "asr": "Something Singapore has done better than Malaysia. In terms of becoming a first world.",
+   "zh_local": "新加坡在成为第一世界国家方面表现优于马来西亚。",
+   "zh_cloud": "新加坡在某些方面做得比马来西亚好，比如在成为发达国家方面。"
+  },
+  {
+   "i": 86,
+   "asr": "Country, they have worked towards it, and they have become a first world country. And I'm sure Malaysia will reach that eventually.",
+   "zh_local": "马来西亚将最终实现这一目标。",
+   "zh_cloud": "作为一个国家，他们一直为此努力，并且已经成为了一个发达国家。我相信马来西亚最终也会达到这个目标的。"
+  },
+  {
+   "i": 87,
+   "asr": "Eventually, if we ourselves put ourselves to working towards that, me too will become a first world country. Because you know when you compare.",
+   "zh_local": "最终，若我们共同朝着目标努力，我也将成为一个第一世界国家。因为你知道，当您进行比较时。",
+   "zh_cloud": "最终，只要我们自己也努力朝着那个目标前进，我也会成为一个发达国家。因为你知道，当你做比较的时候。"
+  },
+  {
+   "i": 88,
+   "asr": "Malaysia and Singapore, apple for apple. I think we've done well in all areas. Singapore, maybe being a smaller country.",
+   "zh_local": "马来西亚和新加坡，苹果的苹果。我们已经做得很好。新加坡，可能作为较小的国家。",
+   "zh_cloud": "马来西亚和新加坡，严格对比来说，我认为我们在各个领域都做得很好。新加坡也许是一个较小的国家。"
+  },
+  {
+   "i": 89,
+   "asr": "They have progressed a bit faster than us, but ours—we are a large country, different, you know.",
+   "zh_local": "我们两国虽然发展速度比他们快一些，但我们是一个大国家，不同。",
+   "zh_cloud": "他们的发展比我们稍快一些，但我们——我们是一个大国，情况不同，你知道的。"
+  },
+  {
+   "i": 90,
+   "asr": "Variety of issues, challenges. So we have, it will take a little bit more time, to resolve those issues.",
+   "zh_local": "解决这些问题需要花一些时间。",
+   "zh_cloud": "各种问题、挑战。所以我们，可能需要多一点时间，来解决这些问题。"
+  },
+  {
+   "i": 91,
+   "asr": "I think in terms of, terms of the economy, they have become like a, they they have better current.",
+   "zh_local": "经济领域，他们已经变得更成熟了。",
+   "zh_cloud": "我认为，就经济方面而言，他们已经变得更加……他们他们拥有了更好的流通货币。"
+  },
+  {
+   "i": 92,
+   "asr": "They have developed their towns better. They have become a financial hub.",
+   "zh_local": "他们已更好发展城镇，并成为金融中心。",
+   "zh_cloud": "他们把城镇建设得更好。他们已经成为一个金融中心。"
+  },
+  {
+   "i": 93,
+   "asr": "So, for a small country, for doing so well, it's really, it's really something like, you know, Malaysia should try to.",
+   "zh_local": "马来西亚应该努力做到。",
+   "zh_cloud": "所以，对于一个如此出色的小国来说，这真的是……这真的是一件值得马来西亚学习借鉴的事情。"
+  },
+  {
+   "i": 94,
+   "asr": "Learn from them. Singapore has done better in Malaysia. I think the public transport there, because I commute to work, yeah, using public.",
+   "zh_local": "新加坡在马来西亚表现更好。因为我在工作时使用公共交通。",
+   "zh_cloud": "向他们学习。新加坡在马来西亚做得更好。我觉得那里的公共交通，因为我通勤上班，是的，使用公共交通。"
+  },
+  {
+   "i": 95,
+   "asr": "Transport. So I already live in a place that has better public transportation, and also I think.",
+   "zh_local": "公共交通较好。",
+   "zh_cloud": "交通。所以我已经住在一个拥有更好公共交通的地方，而且我认为。"
+  },
+  {
+   "i": 96,
+   "asr": "The job opportunity there is better than Malaysia. Like most of the jobs that are not accepted or not well known here, is there in Singapore.",
+   "zh_local": "新加坡有比马来西亚更好的工作机会。",
+   "zh_cloud": "那里的工作机会比马来西亚好。就像这里大多数不被接受或不出名的工作，在新加坡都有。"
+  },
+  {
+   "i": 97,
+   "asr": "Singapore, yeah, I think Singapore is a good place to work there. Is there something Malaysia has done better than Singapore?",
+   "zh_local": "新加坡，我确实认为这里是个不错的地方。马来西亚在这方面做得比新加坡更好吗？",
+   "zh_cloud": "新加坡，是的，我觉得新加坡是一个适合在那工作的地方。马来西亚有没有什么比新加坡做得更好的地方？"
+  },
+  {
+   "i": 98,
+   "asr": "I think Malaysia is then better. I think like the.",
+   "zh_local": "马来西亚更好。",
+   "zh_cloud": "我觉得马来西亚更好。我觉得比如。"
+  },
+  {
+   "i": 99,
+   "asr": "Non urban place like Kampung here is better than Singapore. Like if you want to, if you are maybe fifty and above and you want to.",
+   "zh_local": "非城市地区如Kampung此处更优，如您愿意，可能年龄在50岁以上。",
+   "zh_cloud": "像甘榜这样的非城市地区比新加坡更好。比如如果你想，如果你可能五十岁或以上并且你想。"
+  },
+  {
+   "i": 100,
+   "asr": "Rest and have like, ah houses near the beach or something. It's better to live in Malaysia. It's Singapore I think. Oh, so you mean like you get more.",
+   "zh_local": "住在马来西亚或新加坡更好，尤其是靠近海滩的房屋。",
+   "zh_cloud": "休息一下，然后住海边附近的那种房子，或者类似的。在马来西亚生活更好。我想那是新加坡。哦，你是说你会得到更多。"
+  },
+  {
+   "i": 101,
+   "asr": "Authentic and real experience when you go to Kampung. Yes, yep. What Singapore has done better than Malaysia?",
+   "zh_local": "新加坡做得比马来西亚更好。",
+   "zh_cloud": "当你去甘榜（马来传统村庄）时，会有真实地道的体验。是的，没错。新加坡在哪些方面比马来西亚做得更好？"
+  },
+  {
+   "i": 102,
+   "asr": "I would say, when it comes to cleanliness, yes, the enforcement of that particular rule is what they've done best.",
+   "zh_local": "当谈到清洁问题时，确实是他们的规则实施得最为有效。",
+   "zh_cloud": "我会说，在清洁卫生方面，是的，他们最好地执行了那条特定的规则。"
+  },
+  {
+   "i": 103,
+   "asr": "In a sense, because when it comes to cleanliness, it covers all of everything. Of you know how US is, they're more like.",
+   "zh_local": "在美国，他们更像对待清洁的那样。",
+   "zh_cloud": "从某种意义上说，当谈到清洁时，它涵盖了所有一切。你知道美国是怎样的，他们更像是。"
+  },
+  {
+   "i": 104,
+   "asr": "Being all over the place and whatnot, like for Singapore, you can see everything is just clear, cut and clean.",
+   "zh_local": "新加坡一切清晰可见，如你所见。",
+   "zh_cloud": "到处都是各种各样，比如说新加坡，你能看到一切都清晰、利落、干净。"
+  },
+  {
+   "i": 105,
+   "asr": "Like Malaysia, if you see, there's a few nooks and crannies that still like you know a bit of messiness, a bit garbage.",
+   "zh_local": "像马来西亚，如果看到，仍有几个小角落和装饰，还喜欢一点混乱、一点垃圾。",
+   "zh_cloud": "比如马来西亚，如果你看到的话，仍有一些角落和缝隙有点凌乱、有点垃圾。"
+  },
+  {
+   "i": 106,
+   "asr": "That, but then we still dub KL as the main tourist attraction area. While Singapore maintains.",
+   "zh_local": "但我们将KL作为主要旅游景点区域。新加坡仍维持该地位。",
+   "zh_cloud": "虽然新加坡保持着..."
+  },
+  {
+   "i": 107,
+   "asr": "Every place as clean as possible. Understood. And now let's turn the question: What have Malaysia than better than Singapore?",
+   "zh_local": "马来西亚比新加坡更好。",
+   "zh_cloud": "每个地方都尽可能保持干净，明白了。那么现在我们换个问题：马来西亚有哪些方面比新加坡更好？"
+  },
+  {
+   "i": 108,
+   "asr": "Hmm. I'd say, if Malaysia is a whole, they really.",
+   "zh_local": "马来西亚是一个整体，他们确实如此。",
+   "zh_cloud": "嗯，我觉得，如果把马来西亚看成一个整体的话，他们确实……"
+  },
+  {
+   "i": 109,
+   "asr": "We do unite as a country, as a nation, without any political issue, because even though we have a lot of political.",
+   "zh_local": "我们作为一个国家和一个民族，不因任何政治问题而联合，因为我们拥有许多政治。",
+   "zh_cloud": "我们作为一个国家、一个民族团结在一起，不分任何政治问题，因为尽管我们有很多政治问题。"
+  },
+  {
+   "i": 110,
+   "asr": "Um, mishap here and there, once or twice, especially during COVID. But we still stand united as one.",
+   "zh_local": "我们始终团结在一起。",
+   "zh_cloud": "嗯，这里那里有过一两次小波折，尤其是在新冠疫情期间。但我们仍然团结如一。"
+  },
+  {
+   "i": 111,
+   "asr": "I would not say good job to the government, but good job to the nation itself. Would you consider moving to Singapore for work? No.",
+   "zh_local": "政府不应认为有好工作，但国家本身应得到好工作。是否考虑前往新加坡工作？不。",
+   "zh_cloud": "我不会说政府做得好，而是说这个民族本身做得好。你会考虑为了工作搬到新加坡吗？不会。"
+  },
+  {
+   "i": 112,
+   "asr": "What if the pay is like really really good? Uh, no. Wow. Unless it's a real.",
+   "zh_local": "如果报酬非常优秀，那么不，哦，震惊，除非是真实的。",
+   "zh_cloud": "如果薪酬真的真的非常高呢？呃，不会。哇。除非是真正的。"
+  },
+  {
+   "i": 113,
+   "asr": "Modern job, yeah. And why why wouldn't you? Because I.",
+   "zh_local": "现代工作，你为什么不？因为我是",
+   "zh_cloud": "现代工作，是啊。那你为什么不呢？因为我。"
+  },
+  {
+   "i": 114,
+   "asr": "Think personally because I have all my things and life settled here already, so this is like my comfort zone.",
+   "zh_local": "我的生活和生活已在此定格，这是我的舒适区。",
+   "zh_cloud": "我个人觉得是因为我所有的物品和生活都已经在那里安顿好了，所以这里就像是我的舒适区。"
+  },
+  {
+   "i": 115,
+   "asr": "Yeah, understand. Okay, and by the way, how easy it is for young Malaysians to find job in Singapore.",
+   "zh_local": "新加坡年轻人找工作很容易。",
+   "zh_cloud": "好的，了解。顺便问一下，马来西亚年轻人去新加坡找工作容易吗？"
+  },
+  {
+   "i": 116,
+   "asr": "Based on what I heard, is not that easy. You have to be like really really good at what you do.",
+   "zh_local": "你必须像真的很优秀的人一样。",
+   "zh_cloud": "据我所知，并不是那么容易。你必须得非常非常擅长自己所做的事情。"
+  },
+  {
+   "i": 117,
+   "asr": "And yeah, besides that, the cost of living there I heard is pretty high as well. Yeah, so most of the people that I know who are working in Singapore.",
+   "zh_local": "新加坡生活成本较高，大多数人是工作的人。",
+   "zh_cloud": "另外，那里的生活成本听说也很高。是的，所以我认识的大部分在新加坡工作的人，"
+  },
+  {
+   "i": 118,
+   "asr": "Oh, actually staying in JB. For work, maybe yes, yeah, for work, okay, can probably.",
+   "zh_local": "其实住 JB。工作上可以，是的，是的，可以。",
+   "zh_cloud": "哦，其实住在新山。为了工作，也许是的，是的，为了工作，好的，可能可以。"
+  },
+  {
+   "i": 119,
+   "asr": "And why is that? Of course, they have a better currency, but it's like really.",
+   "zh_local": "为什么？当然，他们拥有更好的货币，但它就像真的。",
+   "zh_cloud": "为什么会这样？当然，他们有更好的货币，但真的是这样。"
+  },
+  {
+   "i": 120,
+   "asr": "Yeah, but the offer have to be like really good. Then only I'm probably boo because, ah, Malaysia still I think you you still have that.",
+   "zh_local": "但必须是一份非常有诚意的邀请。因此，我可能只能以失望而收下，毕竟马来西亚我也认为你仍然有这份诚意。",
+   "zh_cloud": "是的，但这个工作机会必须真的非常好。那样的话我可能才会去，因为，啊，马来西亚的话，我觉得你你还是有那个。"
+  },
+  {
+   "i": 121,
+   "asr": "Balanced lifestyle, in terms of cost of living, I think Malaysia, yeah, Malaysia has done well in terms of like keeping the cost low.",
+   "zh_local": "马来西亚在成本控制方面表现良好。",
+   "zh_cloud": "就生活成本而言，我认为马来西亚，嗯，马来西亚在保持低成本方面做得不错。"
+  },
+  {
+   "i": 122,
+   "asr": "So, yeah, it really have to be super good offer to to move to Singapore. How hard is?",
+   "zh_local": "必须获得超级好的offer以前往新加坡。难度如何？",
+   "zh_cloud": "所以，嗯，要搬到新加坡确实必须有非常好的条件。有多难呢？"
+  },
+  {
+   "i": 123,
+   "asr": "Is it or how easy is it to find jobs in Singapore, as for Malaysian? I think if you are like a.",
+   "zh_local": "新加坡和马来西亚是否容易找工作？如果你像……",
+   "zh_cloud": "对于马来西亚人来说，在新加坡找工作是难还是容易？我想如果你像是……"
+  },
+  {
+   "i": 124,
+   "asr": "I think for the nurses, ah, quite easy because I always hear people, ah, in healthcare is, in Singapore.",
+   "zh_local": "护士们觉得相当容易，因为他们总是听到在新加坡的医疗服务。",
+   "zh_cloud": "我觉得对护士来说，啊，相当容易，因为我总是听人说，啊，在医疗保健行业，在新加坡。"
+  },
+  {
+   "i": 125,
+   "asr": "So my advice is that if you are young and if you got energy and if you wanna make the money, then move to Singapore for the for the money. You know.",
+   "zh_local": "如果年轻有能量且想赚取金钱，建议前往新加坡。",
+   "zh_cloud": "所以我的建议是，如果你年轻，如果你有精力，如果你想赚钱，那就来新加坡赚钱吧。你知道的。"
+  },
+  {
+   "i": 126,
+   "asr": "But if you're looking for work-life balance, I guess again depends on the industry that you're in. I would probably take a shot again with moving to Singapore.",
+   "zh_local": "但若想寻求工作与生活平衡，可能取决于行业而定。我可能再次考虑前往新加坡。",
+   "zh_cloud": "但如果你追求工作与生活的平衡，我觉得这同样取决于你所在的行业。我可能还是会尝试去新加坡。"
+  },
+  {
+   "i": 127,
+   "asr": "In getting a job, but yeah, if the opportunity is there and presents itself, yeah, why not? So in your opinion, you.",
+   "zh_local": "在求职时，只要机会存在并出现，就该考虑是否接受。所以，我认为你。",
+   "zh_cloud": "在找工作方面，但是如果机会出现并主动来临，是啊，为什么不呢？所以在你看来，你。"
+  },
+  {
+   "i": 128,
+   "asr": "Find that peace here in Malaysia, like the ease of. Yeah, because because it's still home, right? You're still so familiar. You have family.",
+   "zh_local": "马来西亚的和平，如同轻松的家一样，因为仍然在这里，你依然熟悉自己，有家人。",
+   "zh_cloud": "在马来西亚找到了那份宁静，比如那种轻松的感觉。是的，因为因为这仍然是家，对吧？你仍然非常熟悉。你有家人。"
+  },
+  {
+   "i": 129,
+   "asr": "Here you've got a car. In Singapore, you're still, you know, a foreigner, right? You still need.",
+   "zh_local": "新加坡你仍需身份。",
+   "zh_cloud": "在这里你有车。在新加坡，你仍然是，你知道，一个外国人，对吧？你仍然需要。"
+  },
+  {
+   "i": 130,
+   "asr": "To rent your the house in somebody's place, you still need to take the bus and train and stuff. But unless you're still home. So do you think there are some.",
+   "zh_local": "需要租别人的房子，你仍需搭乘公共交通。除非你仍然住在家中，所以您是否认为有这种情况？",
+   "zh_cloud": "要在别人的地方租你的房子，你仍然需要坐巴士、火车之类的。但除非你还在家。所以你认为有一些。"
+  },
+  {
+   "i": 131,
+   "asr": "Some advantages of Singapore being your neighbor. Yeah, it's a advantage because now a lot of.",
+   "zh_local": "新加坡作为你的邻居的优势。是的，因为它现在有很多。",
+   "zh_cloud": "新加坡是你邻居的一些优势。是的，这是一个优势，因为现在很多。"
+  },
+  {
+   "i": 132,
+   "asr": "Company, a Singapore company come to Malaysia to to invest and build company here to do business, and I also.",
+   "zh_local": "公司，马来西亚来投资建设公司并开展业务，我也。",
+   "zh_cloud": "公司，一家新加坡公司来马来西亚投资并在这里建公司做生意，我也。"
+  },
+  {
+   "i": 133,
+   "asr": "Ah, last month got offer from a Singapore company to work with them, so I think yeah.",
+   "zh_local": "去年得到了新加坡公司的offer，所以我认为是的。",
+   "zh_cloud": "啊，上个月收到一家新加坡公司的offer，要和他们合作，所以我想是的。"
+  },
+  {
+   "i": 134,
+   "asr": "It's good for for the economy things and get open more opportunity to work for for working. So the outside world.",
+   "zh_local": "有利于经济发展，带来更多工作机会。所以，世界。",
+   "zh_cloud": "这对经济有好处，也能带来更多的工作机会，对外面的世界来说。"
+  },
+  {
+   "i": 135,
+   "asr": "Might not be familiar that the Malaysia and Singapore once used to be one country until nineteen sixty-five. From your.",
+   "zh_local": "马来西亚和新加坡曾于1965年成为单一国家。",
+   "zh_cloud": "可能不太熟悉马来西亚和新加坡曾经是一个国家，直到一九六五年才分开。"
+  },
+  {
+   "i": 136,
+   "asr": "Experience: What was it like back then, seeing the separation taking place in real time? Okay, I was very young then. I was very young. I was.",
+   "zh_local": "我那时很年轻，我那时很年轻。",
+   "zh_cloud": "经历：那时候，看到分离正在实时发生，是什么感觉？好吧，那时候我还很年轻。我很年轻。我确实是。"
+  },
+  {
+   "i": 137,
+   "asr": "Nineteen sixty-five, I was eleven years old. Yeah, of eleven years old. Of course, we read all about it, and.",
+   "zh_local": "1965年，我11岁。是的，那时我们读了很多。",
+   "zh_cloud": "1965年，我十一岁。是的，十一岁。当然，我们读了很多关于那件事的消息，而且。"
+  },
+  {
+   "i": 138,
+   "asr": "Of course, there was a sadness that, you know, that we are one country and now we are going to be needing to have a passport to go to.",
+   "zh_local": "当然，我们有需要一张护照去旅行的悲伤。",
+   "zh_cloud": "当然，有一种悲伤，你知道，我们曾是一个国家，而现在我们将需要持有护照才能去（那里）。"
+  },
+  {
+   "i": 139,
+   "asr": "I know whenever we traveled, we had to go and get a passport to cross into Singapore. Yeah, do you think Singapore?",
+   "zh_local": "新加坡？",
+   "zh_cloud": "我知道每次我们出行的时候，都必须去办理护照才能进入新加坡。嗯，你觉得是新加坡吗？"
+  },
+  {
+   "i": 140,
+   "asr": "Poor made the right choice by separating, or would it have been better if you were still the same country? If you ask me, I would have.",
+   "zh_local": "你选择分开，是好的。如果当初你还是那个国家，也许会更好。",
+   "zh_cloud": "马来西亚通过分治做出了正确的选择，还是说如果你们仍然是一个国家会更好？如果问我的话，我倒是希望如此。"
+  },
+  {
+   "i": 141,
+   "asr": "Preferred that we remained as one country, then we could have progressed very well together, and you know we would have achieved a lot.",
+   "zh_local": "我们应保持为一个国家，共同前进并实现诸多成就。",
+   "zh_cloud": "我更倾向于我们作为一个国家保持不变，这样我们本可以一起很好地发展，而且你知道，我们会取得很多成就。"
+  },
+  {
+   "i": 142,
+   "asr": "More, but Singapore, you know, having separated from Malaysia, from where they were, to where they are now, they are already a first.",
+   "zh_local": "新加坡, 你已经从马来西亚分离到了现在的所在, 这已经是一个第一。",
+   "zh_cloud": "不过，新加坡，你知道，从马来西亚分离出来，从他们原来的地方到他们现在的地方，他们已经是一个第一。"
+  },
+  {
+   "i": 143,
+   "asr": "World country, so looks like it's worked out very well for them, and I would say that we also.",
+   "zh_local": "世界国家，看起来已经为他们做好了充分准备，我认为我们也应当这样。",
+   "zh_cloud": "世界国家，所以看起来对他们来说效果很好，我也会说我们也是。"
+  },
+  {
+   "i": 144,
+   "asr": "We will eventually get to that stage if we work hard. At it, we are the same people. We have the same resources. We have the same talent.",
+   "zh_local": "我们最终会到达这一阶段，因为我们共同努力并拥有相同的资源和能力。",
+   "zh_cloud": "如果我们努力工作，我们最终会达到那个阶段。我们是同一族人。我们拥有相同的资源。我们拥有相同的才能。"
+  },
+  {
+   "i": 145,
+   "asr": "Skills, so I'm sure, given the opportunity, we will do it. Malaysia will become a first world country eventually.",
+   "zh_local": "马来西亚将成为世界第一国家。",
+   "zh_cloud": "技能，所以我相信，如果有机会，我们会做到的。马来西亚最终将成为一个发达国家。"
+  },
+  {
+   "i": 146,
+   "asr": "What do you think Singapore has developed so much faster than Malaysia? I think maybe they they went into like a.",
+   "zh_local": "新加坡比马来西亚在很多方面发展得更快。",
+   "zh_cloud": "您认为新加坡为什么发展得比马来西亚快得多？我想也许他们他们进入了类似的状态。"
+  },
+  {
+   "i": 147,
+   "asr": "Survival mode, like they really need to develop, because they have been surrounded by different big.",
+   "zh_local": "生存模式，因为他们在被不同的强大包围而需要发展。",
+   "zh_cloud": "生存模式，他们真的需要发展，因为他们一直被不同的大家所包围。"
+  },
+  {
+   "i": 148,
+   "asr": "Big countries like Indonesia, Malaysia, and all that, from that, and also I think the.",
+   "zh_local": "印尼、马来西亚等大国家，从这里，我也认为",
+   "zh_cloud": "像印度尼西亚、马来西亚等等的大国，从这方面来看，而且我也认为的。"
+  },
+  {
+   "i": 149,
+   "asr": "They have a better control in terms of planning, because Singapore is like a, it's not like fourteen states.",
+   "zh_local": "新加坡在规划方面的控制更好，因为它不像14个州。",
+   "zh_cloud": "它们在规划方面有更好的管控，因为新加坡不像，新加坡不是一个拥有十四个州的地方。"
+  },
+  {
+   "i": 150,
+   "asr": "Hit and Borneo and all that, so probably they have a better control in terms of planning, and of course maybe their leadership also.",
+   "zh_local": "Hit and Borneo, so they likely have better control in planning and their leadership.",
+   "zh_cloud": "还有婆罗洲等等，所以可能在规划方面它们有更好的管控，当然也可能因为它们的领导层。"
+  },
+  {
+   "i": 151,
+   "asr": "So like quite better, so due to that I think they they managed to do it like properly and carefully, yeah.",
+   "zh_local": "他们确实做得很好，我倾向于认为他们成功地做到了尽可能地仔细和谨慎。",
+   "zh_cloud": "所以其实更好，正因为如此，我认为他们成功地妥善而仔细地完成了这件事，是的。"
+  },
+  {
+   "i": 152,
+   "asr": "I think they had wonderful leadership. The people who led the country did a fantastic job, and they were very very.",
+   "zh_local": "他们领导得非常好，国家领导人尽职尽责，表现非常出色。",
+   "zh_cloud": "我认为他们有着出色的领导力。那些领导这个国家的人做得很棒，而且他们非常非常……"
+  },
+  {
+   "i": 153,
+   "asr": "Smart, they were very tactful, and they knew what they were like. They knew what they were doing obviously, but I think it was just the.",
+   "zh_local": "他们非常机智，且知道自己的处境和行动。他们知道自己本来该这样做，但我认为只是如此。",
+   "zh_cloud": "聪明，他们非常圆滑老练，而且他们清楚自己是什么样的人。他们显然清楚自己在做什么，但我认为这恰恰就是……"
+  },
+  {
+   "i": 154,
+   "asr": "Ah, guts and the and the grit because they felt obviously they felt like they were much smaller nation and they've got a lot more proof.",
+   "zh_local": "他们觉得明显像是一个更小的国家，拥有了更多的证据。",
+   "zh_cloud": "嗯，胆量和毅力，因为他们显然觉得自己的国家要小得多，而且他们有更多的证明。"
+  },
+  {
+   "i": 155,
+   "asr": "So I think they just went for it, you know, and Singapore is Singapore today because of the leadership that started like way back when the separation.",
+   "zh_local": "他们只是做了选择，因为新加坡今日就是因为它当时的领导力。",
+   "zh_cloud": "所以我觉得他们就是放手去做了，你知道，新加坡能有今天，正是因为那种从分家时期就开启的领导力。"
+  },
+  {
+   "i": 156,
+   "asr": "Do you think Malaysians feel proud of Singapore's success, or is there some kind of jealousy?",
+   "zh_local": "马来人是否感到自豪，还是存在嫉妒？",
+   "zh_cloud": "你觉得马来西亚人对新加坡的成功感到自豪吗，还是会有些嫉妒？"
+  },
+  {
+   "i": 157,
+   "asr": "How developed they are. Depends who you ask. I think young people probably would.",
+   "zh_local": "他们的发展程度取决于谁询问。我认为年轻人会。",
+   "zh_cloud": "他们已经发展到何种程度，取决于你问谁。我觉得年轻人可能会认同。"
+  },
+  {
+   "i": 158,
+   "asr": "Feel like ah, you know like yeah, but I'm proud of Singapore.",
+   "zh_local": "我感到自豪，新加坡。",
+   "zh_cloud": "感觉就像是，哎，你知道，就像，嗯，是的，但我为新加坡感到自豪。"
+  },
+  {
+   "i": 159,
+   "asr": "Because I've lived there and I've been there, and I know I've moved around the people, and yeah, it's.",
+   "zh_local": "因为长期居住并熟悉当地居民，所以是。",
+   "zh_cloud": "因为我在那里生活过，也去过那里，而且我知道我在那里和人们相处过，所以，是的，就是这样。"
+  },
+  {
+   "i": 160,
+   "asr": "It's proud. It's such a proud thing to, from a small nation to be such a powerhouse. You know, but obviously there's a little bit of.",
+   "zh_local": "它自称为英雄，从一个小国家成长为强盛的国家。您知道，当然也有点小。",
+   "zh_cloud": "它令人骄傲。从一个小国成为如此强大的力量，这是一件非常令人骄傲的事情。你知道，但显然有一点……"
+  },
+  {
+   "i": 161,
+   "asr": "A competition, a bit of sibling rivalry going on. Yeah.",
+   "zh_local": "比赛，是兄弟间的争斗。",
+   "zh_cloud": "竞争，一点手足之间的竞争。是的。"
+  },
+  {
+   "i": 162,
+   "asr": "Okay, and do you think it's possible for Malaysia to be able to follow their footsteps in the near future? Absolutely, there's a we've got a long way.",
+   "zh_local": "马来西亚能否在未来跟随其脚步？是的，我们还有很长的路要走。",
+   "zh_cloud": "好的，你认为马来西亚在不久的将来有可能跟随他们的脚步吗？当然可以，我们还有很长的路要走。"
+  },
+  {
+   "i": 163,
+   "asr": "But again, if we want to, we can. It's not impossible. Yeah, it just takes a lot of.",
+   "zh_local": "但如果我们想要，可以。这是不现实的。是的，它需要很多时间。",
+   "zh_cloud": "但是再说一次，如果想的话，我们是可以的。这并非不可能。是的，这只是需要大量的。"
+  },
+  {
+   "i": 164,
+   "asr": "Excellent leadership. I think. Okay, I don't think we feel jealous. Definitely not. We wish them well.",
+   "zh_local": "出色的领导。我认同。我们并不感到嫉妒。我们希望他们得到充分的尊重。",
+   "zh_cloud": "出色的领导力。我认为。好的，我不认为我们会嫉妒。绝对不会。我们祝他们一切顺利。"
+  },
+  {
+   "i": 165,
+   "asr": "Well, they are like our brothers. They are like our brothers. They are—you know—we are one. You know—we are one people. They are like our brothers. We don't feel.",
+   "zh_local": "我们都是兄弟。我们是一家人。他们像我们的兄弟。我们并不感到。",
+   "zh_cloud": "嗯，他们就像我们的兄弟。他们就像我们的兄弟。他们——你知道——我们是一体的。你知道——我们是一个民族。他们就像我们的兄弟。我们不会感到。"
+  },
+  {
+   "i": 166,
+   "asr": "Jealous, but we hope that one day we will also reach their standard of progress, their standard of unity, and you know.",
+   "zh_local": "我们希望有一天能与他们达到同样标准的进步、统一标准。",
+   "zh_cloud": "嫉妒，但我们希望有一天我们也能达到他们的进步标准、团结标准，你知道的。"
+  },
+  {
+   "i": 167,
+   "asr": "For what they stand for, and we will also come there because we are one people. You know, all of us have our relatives there.",
+   "zh_local": "我们齐聚于此，因为我们都属于同一族群。",
+   "zh_cloud": "为了他们所代表的东西，我们也会到达那里，因为我们是一个民族。你知道，我们所有人那里都有亲戚。"
+  },
+  {
+   "i": 168,
+   "asr": "They have their relatives. Yeah. So you think it's possible for Malaysia to follow in their footsteps in the future? In the future, yes. Yeah.",
+   "zh_local": "他们有亲属。是的。未来他们是否能效仿他们的脚步？是的。",
+   "zh_cloud": "他们有他们的亲戚。是。你认为马来西亚未来有可能追随他们的脚步吗？在未来，是的。是的。"
+  },
+  {
+   "i": 169,
+   "asr": "Yes, it may not happen tomorrow, or maybe in the next five or ten years, but maybe in time to come, maybe in the next fifteen years.",
+   "zh_local": "可能不会在明天发生，或者可能在未来五到十年，甚至十五年后，也可能在时间到时发生。",
+   "zh_cloud": "是的，它可能不会在明天发生，或者也许在未来的五到十年，但也许在将来的某个时候，也许在未来十五年内。"
+  },
+  {
+   "i": 170,
+   "asr": "We will, we will look around us. You know, this is Kuala Lumpur. All this was not there twenty years ago. Or maybe sorry.",
+   "zh_local": "我们都会四处看看。你知道，这是吉隆坡。这二十年来没有这里。或者，抱歉。",
+   "zh_cloud": "我们会，我们会环顾四周。你知道，这是吉隆坡。所有这些二十年前都不在。也许抱歉。"
+  },
+  {
+   "i": 171,
+   "asr": "Maybe thirty years ago, it wasn't. It wasn't here. Look at it now, and when you come in another ten years, you'll see a different scenario over here.",
+   "zh_local": "可能十年前不是。现在不是。当你回到过去十年，这里会看到一种不同的景象。",
+   "zh_cloud": "也许三十年前，它不在。它不在这里。现在看看它，十年后当你再来这里时，你会看到这里不同的景象。"
+  },
+  {
+   "i": 172,
+   "asr": "So we are in that direction, and I'm a very proud Malaysian. I'm very proud to be Malaysian. It all comes down to.",
+   "zh_local": "我们在那条路上，我是一个非常自豪的马来西亚人。这所有都归结到。",
+   "zh_cloud": "所以我们朝着那个方向发展，而且我是一个非常自豪的马来西亚人。我很自豪自己是马来西亚人。这一切都归结于此。"
+  },
+  {
+   "i": 173,
+   "asr": "How we look at it, whether you want to see it as a healthy competition or, like, yeah, there to be too competitive.",
+   "zh_local": "如何看待它，无论你希望它被视为健康的竞争，还是像这样，我们都会过于竞争。",
+   "zh_cloud": "我们如何看待它，无论你是想把它看作是一种良性竞争，或者，是的，存在太过激烈的竞争。"
+  },
+  {
+   "i": 174,
+   "asr": "I think personally, I feel like, I don't feel jealous that people are living in Singapore, and because, we do have our.",
+   "zh_local": "我觉得自己并不觉得新加坡人生活得这么好，因为我们也有。",
+   "zh_cloud": "我个人觉得，我觉得，我并不嫉妒人们生活在新加坡，因为，我们确实拥有我们的。"
+  },
+  {
+   "i": 175,
+   "asr": "Own good stuff here as well. So, so in your opinion, do you think Malaysia will be able to follow in Singapore's footsteps in the?",
+   "zh_local": "马来西亚将能效仿新加坡的脚步。",
+   "zh_cloud": "这里也有很多不错的东西。那么，在您看来，您认为马来西亚能够效仿新加坡吗？"
+  },
+  {
+   "i": 176,
+   "asr": "Definitely, there's a possibility, and it all depends on how open everyone are.",
+   "zh_local": "肯定，存在可能，所有取决于每个人的开放程度。",
+   "zh_cloud": "当然，有这种可能，这完全取决于大家的开放程度。"
+  },
+  {
+   "i": 177,
+   "asr": "Cool. Last question: Malaysia is almost never mentioned in the international media, so the outside world doesn't really.",
+   "zh_local": "马来西亚几乎不被国际媒体提及，因此世界公众并不真正如此。",
+   "zh_cloud": "好的。最后一个问题：马来西亚在国际媒体上几乎从未被提及，所以外界并不真正（了解）。"
+  },
+  {
+   "i": 178,
+   "asr": "Really know much about Malaysia as a country. What's one thing that you wish Singapore or the rest of the world would?",
+   "zh_local": "马来西亚了解很多。你希望新加坡或世界的其他地方有什么？",
+   "zh_cloud": "其实并不太了解马来西亚这个国家。有没有一件事是你希望新加坡或者世界其他国家能了解的？"
+  },
+  {
+   "i": 179,
+   "asr": "Um, know understand better about Malaysia. Um, I hope they don't.",
+   "zh_local": "马来西亚了解一下。希望他们不会。",
+   "zh_cloud": "嗯，能更好地了解和理解马来西亚。嗯，我希望他们不要这样。"
+  },
+  {
+   "i": 180,
+   "asr": "See, they don't see us just as a country that is not so developed and.",
+   "zh_local": "他们并不只是作为一个不发达的国家来看待。",
+   "zh_cloud": "看，他们不要仅仅把我们看作是一个不太发达的国家，而且。"
+  },
+  {
+   "i": 181,
+   "asr": "I hope we are not known for the missing airplane as well. And the people here actually were.",
+   "zh_local": "我们希望不以失机飞机闻名，并且这里的人们确实如此。",
+   "zh_cloud": "我希望我们也不会因为那架失踪的飞机而出名。而且这里的人确实是这样的。"
+  },
+  {
+   "i": 182,
+   "asr": "Very friendly and everyone can speak at least three languages, and apparently I did notice it's actually like quite amazing to some.",
+   "zh_local": "非常友好，大家至少能说三种语言，而且我注意到实际上对一些人来说，情况确实相当令人印象深刻。",
+   "zh_cloud": "非常友好，每个人至少会说三种语言，而且我显然注意到，这实际上对一些人来说确实非常惊人。"
+  },
+  {
+   "i": 183,
+   "asr": "From other people, so people should come and really like dive into the culture here, enjoy the food.",
+   "zh_local": "从其他人那里，因此人们应前往这里，真正地喜欢文化、享受美食。",
+   "zh_cloud": "从其他人那里，所以人们应该来并且真正地深入了解这里的文化，享受美食。"
+  },
+  {
+   "i": 184,
+   "asr": "Try Singapore Malaysian food and share share with us which is the better. Okay, fair. That will be all for.",
+   "zh_local": "新加坡马来西亚美食，分享分享，好。",
+   "zh_cloud": "尝试一下新加坡和马来西亚的食物，然后和我们分享哪个更好。好的，很公平。今天就到这里。"
+  },
+  {
+   "i": 185,
+   "asr": "Today, thank you so much for sharing your honest thoughts.",
+   "zh_local": "感谢你分享你的真诚想法。",
+   "zh_cloud": "非常感谢你今天分享你的真实想法。"
+  }
+ ]
+}
