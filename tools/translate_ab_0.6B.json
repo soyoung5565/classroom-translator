@@ -1,0 +1,107 @@
+[
+ {
+  "i": 1,
+  "latency_s": 1.15,
+  "tokens": 14,
+  "en": "So when you think of Singaporeans, do you feel like we are the same people?",
+  "zh": "新加坡人，我们是否就是一样的人？"
+ },
+ {
+  "i": 2,
+  "latency_s": 0.58,
+  "tokens": 11,
+  "en": "What's the first thing that comes to your mind when you think about Singapore?",
+  "zh": "新加坡的第一想到的是什么？"
+ },
+ {
+  "i": 3,
+  "latency_s": 0.4,
+  "tokens": 7,
+  "en": "Yeah, that's how I feel about Singapore.",
+  "zh": "新加坡。"
+ },
+ {
+  "i": 4,
+  "latency_s": 0.39,
+  "tokens": 10,
+  "en": "Yeah, then, correct.",
+  "zh": "是的，对。"
+ },
+ {
+  "i": 5,
+  "latency_s": 0.59,
+  "tokens": 13,
+  "en": "I I I don't know, probably it's it's the preparation.",
+  "zh": "我也不知道，大概它是准备好的。"
+ },
+ {
+  "i": 6,
+  "latency_s": 0.65,
+  "tokens": 13,
+  "en": "And I also born here and of course I choose Malaysia better lah.",
+  "zh": "我在这里出生并选择马来西亚更好。"
+ },
+ {
+  "i": 7,
+  "latency_s": 0.85,
+  "tokens": 18,
+  "en": "because it's, it's relatively a small country, so they always come here as a tourist.",
+  "zh": "它相对是一个小国家，因此他们总是来这里作为游客。"
+ },
+ {
+  "i": 8,
+  "latency_s": 0.52,
+  "tokens": 9,
+  "en": "Distant cousins, one of us.",
+  "zh": "远亲之一。"
+ },
+ {
+  "i": 9,
+  "latency_s": 0.84,
+  "tokens": 14,
+  "en": "Is there something Malaysia has done better than Singapore?",
+  "zh": "马来西亚在某些方面比新加坡做得更好。"
+ },
+ {
+  "i": 10,
+  "latency_s": 0.44,
+  "tokens": 11,
+  "en": "Would you consider moving to Singapore for work?",
+  "zh": "是否考虑前往新加坡工作？"
+ },
+ {
+  "i": 11,
+  "latency_s": 0.7,
+  "tokens": 12,
+  "en": "Uh, so yeah, it really has to be a super good uh offer to to move to Singapore.",
+  "zh": "必须有一个非常好的新加坡offer。"
+ },
+ {
+  "i": 12,
+  "latency_s": 1.04,
+  "tokens": 20,
+  "en": "So the outside world might not be familiar that the Malaysia and Singapore once used to be one country until 1965.",
+  "zh": "马来西亚和新加坡之前曾是一个国家，直到1965年。"
+ },
+ {
+  "i": 13,
+  "latency_s": 0.47,
+  "tokens": 10,
+  "en": "And of course uh maybe their leadership also.",
+  "zh": "他们或许也有领导。"
+ },
+ {
+  "i": 14,
+  "latency_s": 0.35,
+  "tokens": 8,
+  "en": "It's not impossible.",
+  "zh": "不可能的。"
+ },
+ {
+  "i": 15,
+  "latency_s": 0.83,
+  "tokens": 19,
+  "en": "Look at it now, and when you come in another ten years, you'll see a different scenery over here.",
+  "zh": "查看现在，你再过十年，这里将看到不同的景色。"
+ }
+]
