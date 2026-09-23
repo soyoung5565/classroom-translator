@@ -1,0 +1,882 @@
+[
+ {
+  "i": 1,
+  "dur": 8.0,
+  "asr": 5.72,
+  "trans": 2.35,
+  "e2e": 8.07,
+  "keep_up": false,
+  "en": "language English<asr_text>So when you think of Singaporeans, do you feel like we are the same people? Yeah, you feel like almost like meeting a Malaysian, but.",
+  "zh": "新加坡人，你会觉得我们是同一群人吗？是的，你感觉几乎像在见到马来人，但。"
+ },
+ {
+  "i": 2,
+  "dur": 8.0,
+  "asr": 4.95,
+  "trans": 1.44,
+  "e2e": 6.39,
+  "keep_up": true,
+  "en": "language English<asr_text>Ah, slightly richer. The people's is same, but the thinking of the Singaporean is different. So I think they have this perception.",
+  "zh": "新加坡人对这种现象的看法不同，因此我认为他们有这种感知。"
+ },
+ {
+  "i": 3,
+  "dur": 0.9,
+  "asr": 1.32,
+  "trans": 0.84,
+  "e2e": 2.16,
+  "keep_up": false,
+  "en": "language English<asr_text>That.",
+  "zh": "That."
+ },
+ {
+  "i": 4,
+  "dur": 8.0,
+  "asr": 5.55,
+  "trans": 2.2,
+  "e2e": 7.75,
+  "keep_up": true,
+  "en": "language English<asr_text>They are better, you know. That this general perception that you know, obviously, they are better than Malaysians. Hey everybody, here at Asian Buzz.",
+  "zh": "他们更好，你知道。这就是你认识的普遍看法，显然比马来人更好。Hey everybody, here at Asian Buzz."
+ },
+ {
+  "i": 5,
+  "dur": 8.0,
+  "asr": 4.92,
+  "trans": 1.71,
+  "e2e": 6.63,
+  "keep_up": true,
+  "en": "language English<asr_text>As we strive to bring you the most authentic hyperlocal insights from Asia, straight from real people's voices.",
+  "zh": "我们力求为您提供来自亚洲的最真实的本地化见解，直击真实人群的声音。"
+ },
+ {
+  "i": 6,
+  "dur": 8.0,
+  "asr": 5.14,
+  "trans": 0.93,
+  "e2e": 6.07,
+  "keep_up": true,
+  "en": "language English<asr_text>Today we're super excited to bring you our first street interview from Malaysia, a country that's rarely covered by international.",
+  "zh": "马来西亚首场街道访谈"
+ },
+ {
+  "i": 7,
+  "dur": 8.0,
+  "asr": 5.28,
+  "trans": 1.24,
+  "e2e": 6.52,
+  "keep_up": true,
+  "en": "language English<asr_text>Before we hit the streets of Kuala Lumpur, a quick shout out to our partner GiveAsia. GiveAsia is a kindness platform based in Singapore.",
+  "zh": "GiveAsia is a kindness platform based in Singapore."
+ },
+ {
+  "i": 8,
+  "dur": 8.0,
+  "asr": 4.7,
+  "trans": 1.67,
+  "e2e": 6.37,
+  "keep_up": true,
+  "en": "language English<asr_text>That inspires acts of kindness by empowering people to donate, volunteer, and support meaningful causes.",
+  "zh": "激励人们行善行为，激发捐赠、志愿服务及支持有意义的公益活动。"
+ },
+ {
+  "i": 9,
+  "dur": 8.0,
+  "asr": 5.49,
+  "trans": 1.78,
+  "e2e": 7.27,
+  "keep_up": true,
+  "en": "language English<asr_text>We've even been collaborating to alleviate poverty in Malaysia. Check out our recent documentary, *Wicked Asia*, where we shed a light.",
+  "zh": "我们已与马来西亚合作缓解贫困。查看我们的最新纪录片《Wicked Asia》。"
+ },
+ {
+  "i": 10,
+  "dur": 8.0,
+  "asr": 5.0,
+  "trans": 2.3,
+  "e2e": 7.29,
+  "keep_up": true,
+  "en": "language English<asr_text>On child malnourishment in Malaysia, and helped a single mum struggling to feed her five children. We surprised her with fortified.",
+  "zh": "马来西亚儿童营养不良问题，帮助一位单亲妈妈艰难养育五位孩子。我们惊喜地为她提供了强化食物。"
+ },
+ {
+  "i": 11,
+  "dur": 8.0,
+  "asr": 5.32,
+  "trans": 2.19,
+  "e2e": 7.51,
+  "keep_up": true,
+  "en": "language English<asr_text>Milk and extra support to help her kids, but so many families like hers still need immediate help. We're aiming to provide fortified milk.",
+  "zh": "牛奶和额外的支持来帮助她的孩子，但许多家庭仍然需要立即的帮助。我们正在努力提供 fortified milk。"
+ },
+ {
+  "i": 12,
+  "dur": 8.0,
+  "asr": 5.15,
+  "trans": 1.59,
+  "e2e": 6.74,
+  "keep_up": true,
+  "en": "language English<asr_text>For five hundred children for six months, and you can support by making a small donation or simply sharing the campaign. Check out.",
+  "zh": "五百名儿童六个月内支持，可捐赠或分享。查看。"
+ },
+ {
+  "i": 13,
+  "dur": 8.0,
+  "asr": 5.36,
+  "trans": 1.7,
+  "e2e": 7.06,
+  "keep_up": true,
+  "en": "language English<asr_text>Check out the latest campaign we're supporting in the description below, and see how we can all help make the world a kinder place.",
+  "zh": "检查下方描述中的最新活动，看看我们如何共同为世界变得更加善良。"
+ },
+ {
+  "i": 14,
+  "dur": 8.0,
+  "asr": 5.73,
+  "trans": 1.7,
+  "e2e": 7.43,
+  "keep_up": true,
+  "en": "language English<asr_text>Together, we can make a difference as a community. Now let's go to our reporter in Kuala Lumpur. What's the first thing that comes to mind?",
+  "zh": "我们社区可以一起做出改变。现在让我们前往马来西亚的记者。首先想到的是什么呢？"
+ },
+ {
+  "i": 15,
+  "dur": 2.3,
+  "asr": 2.58,
+  "trans": 0.72,
+  "e2e": 3.29,
+  "keep_up": false,
+  "en": "language English<asr_text>To your mind, when you think about Singapore.",
+  "zh": "新加坡"
+ },
+ {
+  "i": 16,
+  "dur": 8.0,
+  "asr": 4.29,
+  "trans": 1.05,
+  "e2e": 5.35,
+  "keep_up": true,
+  "en": "language English<asr_text>Singapore is good clean. No good food. Compared to Malaysian, I.",
+  "zh": "新加坡很干净，但不像马来西亚的好。"
+ },
+ {
+  "i": 17,
+  "dur": 8.0,
+  "asr": 4.96,
+  "trans": 1.1,
+  "e2e": 6.05,
+  "keep_up": true,
+  "en": "language English<asr_text>I think Singapore has a better economy, and it is always ah more advanced because of the.",
+  "zh": "新加坡经济更好，因为总是更先进。"
+ },
+ {
+  "i": 18,
+  "dur": 8.0,
+  "asr": 5.51,
+  "trans": 0.86,
+  "e2e": 6.37,
+  "keep_up": true,
+  "en": "language English<asr_text>Technology and also the job, the job, is such lah. First thing that comes to my mind is that Singapore is a small country.",
+  "zh": "新加坡是一个小国。"
+ },
+ {
+  "i": 19,
+  "dur": 5.4,
+  "asr": 3.37,
+  "trans": 1.28,
+  "e2e": 4.65,
+  "keep_up": true,
+  "en": "language English<asr_text>But even though it's small, it's super developed, and the.",
+  "zh": "但即使它很小，它也很发达，且。"
+ },
+ {
+  "i": 20,
+  "dur": 3.8,
+  "asr": 2.87,
+  "trans": 0.89,
+  "e2e": 3.76,
+  "keep_up": true,
+  "en": "language English<asr_text>Transportation there is pretty good public transportation.",
+  "zh": "公共交通很好。"
+ },
+ {
+  "i": 21,
+  "dur": 8.0,
+  "asr": 4.98,
+  "trans": 2.05,
+  "e2e": 7.04,
+  "keep_up": true,
+  "en": "language English<asr_text>Everywhere is very clean, and they don't allow chewing gums. Like this stereotype is, they always think that.",
+  "zh": "到处都很干净，他们不允许咬嚼物。就像这种刻板印象一样，他们总是这么想。"
+ },
+ {
+  "i": 22,
+  "dur": 7.3,
+  "asr": 3.9,
+  "trans": 1.42,
+  "e2e": 5.32,
+  "keep_up": true,
+  "en": "language English<asr_text>Their food is better than ours, and the in reality. In reality, is.",
+  "zh": "他们的食物比我们更好，而且实际上。在事实上，是。"
+ },
+ {
+  "i": 23,
+  "dur": 8.0,
+  "asr": 4.87,
+  "trans": 1.27,
+  "e2e": 6.14,
+  "keep_up": true,
+  "en": "language English<asr_text>They need to come here more to taste our food. The difference in our currency, the Singapore dollar is much higher than our.",
+  "zh": "他们需要更多地前来品尝我们的食物。新加坡的货币——苏氏美元比我们高出很多。"
+ },
+ {
+  "i": 24,
+  "dur": 8.0,
+  "asr": 4.74,
+  "trans": 1.59,
+  "e2e": 6.33,
+  "keep_up": true,
+  "en": "language English<asr_text>Malaysian ringgit. So when we go there, we have a issue with spending as much as we.",
+  "zh": "马来西亚盾。当我们去那里时，我们遇到资金支出超过我们的问题。"
+ },
+ {
+  "i": 25,
+  "dur": 8.0,
+  "asr": 4.8,
+  "trans": 1.15,
+  "e2e": 5.95,
+  "keep_up": true,
+  "en": "language English<asr_text>You'd like to. What would be the some common stereotypes that Malaysians have about Singaporeans? Any stereotype.",
+  "zh": "Malaysians have some stereotypes about Singaporeans."
+ },
+ {
+  "i": 26,
+  "dur": 2.3,
+  "asr": 2.28,
+  "trans": 1.3,
+  "e2e": 3.58,
+  "keep_up": false,
+  "en": "language English<asr_text>Yeah, okay. They're very rich.",
+  "zh": "嗯，他们很富有。"
+ },
+ {
+  "i": 27,
+  "dur": 4.3,
+  "asr": 3.17,
+  "trans": 1.27,
+  "e2e": 4.44,
+  "keep_up": false,
+  "en": "language English<asr_text>Because their currency is so good, they're very rich. They're very.",
+  "zh": "他们的货币很优秀，他们非常富足。"
+ },
+ {
+  "i": 28,
+  "dur": 1.3,
+  "asr": 1.7,
+  "trans": 0.83,
+  "e2e": 2.53,
+  "keep_up": false,
+  "en": "language English<asr_text>Hardworking.",
+  "zh": "Hardworking"
+ },
+ {
+  "i": 29,
+  "dur": 2.5,
+  "asr": 2.11,
+  "trans": 0.89,
+  "e2e": 3.01,
+  "keep_up": false,
+  "en": "language English<asr_text>And it's a land of opportunity.",
+  "zh": "这是一个机遇之地。"
+ },
+ {
+  "i": 30,
+  "dur": 4.4,
+  "asr": 3.22,
+  "trans": 1.11,
+  "e2e": 4.33,
+  "keep_up": true,
+  "en": "language English<asr_text>When the Singaporean come to the Malaysian, they have become more.",
+  "zh": "马来西亚人来到新加坡后变得更。"
+ },
+ {
+  "i": 31,
+  "dur": 8.0,
+  "asr": 3.92,
+  "trans": 0.61,
+  "e2e": 4.53,
+  "keep_up": true,
+  "en": "language English<asr_text>You know because in the in Singapore are very strict rules but when they come to Malaysia they are become more wild Have you actually been",
+  "zh": "新加坡严格的规则但进入马来西亚后变得更为野。"
+ },
+ {
+  "i": 32,
+  "dur": 3.0,
+  "asr": 1.38,
+  "trans": 0.52,
+  "e2e": 1.9,
+  "keep_up": true,
+  "en": "language English<asr_text>To Singapore before, I think.",
+  "zh": "新加坡前，我想到。"
+ },
+ {
+  "i": 33,
+  "dur": 5.4,
+  "asr": 2.23,
+  "trans": 0.72,
+  "e2e": 2.94,
+  "keep_up": true,
+  "en": "language English<asr_text>Twice or twice, yeah. And in your opinion, how different.",
+  "zh": "两次或者两次，对吗？你意见如何不同？"
+ },
+ {
+  "i": 34,
+  "dur": 4.5,
+  "asr": 1.98,
+  "trans": 0.67,
+  "e2e": 2.65,
+  "keep_up": true,
+  "en": "language English<asr_text>Is Singapore from Malaysia? Ah, okay. So I feel like.",
+  "zh": "新加坡是否属于马来西亚？哦，是的。我现在感觉像这样。"
+ },
+ {
+  "i": 35,
+  "dur": 8.0,
+  "asr": 3.23,
+  "trans": 0.94,
+  "e2e": 4.17,
+  "keep_up": true,
+  "en": "language English<asr_text>It's like KL, but more structured and more regulated. Yeah, that's how I feel about Singapore.",
+  "zh": "新加坡就像KL，更结构化和更规范。是的，我认为新加坡就是这样。"
+ },
+ {
+  "i": 36,
+  "dur": 2.5,
+  "asr": 1.42,
+  "trans": 0.4,
+  "e2e": 1.82,
+  "keep_up": true,
+  "en": "language English<asr_text>I've lived in Singapore.",
+  "zh": "新加坡生活"
+ },
+ {
+  "i": 37,
+  "dur": 1.8,
+  "asr": 1.37,
+  "trans": 0.5,
+  "e2e": 1.87,
+  "keep_up": false,
+  "en": "language English<asr_text>Studied there and worked there.",
+  "zh": "已经在这里学习并工作。"
+ },
+ {
+  "i": 38,
+  "dur": 1.9,
+  "asr": 1.3,
+  "trans": 0.59,
+  "e2e": 1.89,
+  "keep_up": true,
+  "en": "language English<asr_text>And from what people tell me.",
+  "zh": "And from what people tell me."
+ },
+ {
+  "i": 39,
+  "dur": 5.1,
+  "asr": 2.26,
+  "trans": 0.62,
+  "e2e": 2.88,
+  "keep_up": true,
+  "en": "language English<asr_text>They think that Malaysians are way friendlier and warmer.",
+  "zh": "马来人认为他们更友善温和。"
+ },
+ {
+  "i": 40,
+  "dur": 8.0,
+  "asr": 3.42,
+  "trans": 0.83,
+  "e2e": 4.25,
+  "keep_up": true,
+  "en": "language English<asr_text>As people, Singaporeans tend to be a bit more. I think not just reserved. I think they have.",
+  "zh": "新加坡人通常更有些许。我认为他们并不只是保持这种态度。"
+ },
+ {
+  "i": 41,
+  "dur": 1.6,
+  "asr": 1.2,
+  "trans": 0.43,
+  "e2e": 1.63,
+  "keep_up": false,
+  "en": "language English<asr_text>This perception that.",
+  "zh": "这种感知。"
+ },
+ {
+  "i": 42,
+  "dur": 8.0,
+  "asr": 3.57,
+  "trans": 0.99,
+  "e2e": 4.56,
+  "keep_up": true,
+  "en": "language English<asr_text>They are better, you know, that this general perception that you know obviously they are better than Malaysians, but working in Singapore.",
+  "zh": "他们更清楚，你明白这一点，新加坡人比马来人更好，但正在工作。"
+ },
+ {
+  "i": 43,
+  "dur": 6.2,
+  "asr": 2.62,
+  "trans": 0.71,
+  "e2e": 3.33,
+  "keep_up": true,
+  "en": "language English<asr_text>Singapore and dealing with Singaporeans and people from all over the world, they think Malaysians are.",
+  "zh": "新加坡人和世界各地的人，他们都认为马来人。"
+ },
+ {
+  "i": 44,
+  "dur": 1.1,
+  "asr": 1.13,
+  "trans": 0.38,
+  "e2e": 1.51,
+  "keep_up": false,
+  "en": "language English<asr_text>Nice.",
+  "zh": "nice"
+ },
+ {
+  "i": 45,
+  "dur": 8.0,
+  "asr": 4.02,
+  "trans": 0.74,
+  "e2e": 4.75,
+  "keep_up": true,
+  "en": "language English<asr_text>When you are in Singapore and the locals find out that you're from Malaysia, how do they react? Like, how's their behavior? They go like, \"Oh, you're from...\"",
+  "zh": "马来西亚人在新加坡遇到外国游客时的反应。"
+ },
+ {
+  "i": 46,
+  "dur": 8.0,
+  "asr": 4.26,
+  "trans": 1.48,
+  "e2e": 5.74,
+  "keep_up": true,
+  "en": "language English<asr_text>Malaysia, no wonder, you know they go, and then I'm like, \"What do you mean, no wonder?\" I said, \"No, it's the way you speak, it's the way you.\"",
+  "zh": "马来西亚，你知道他们去，然后我像“你到底意味着什么，不应该是‘不’？”我说：“不是，是因为你说话的方式，是你的方式。”"
+ },
+ {
+  "i": 47,
+  "dur": 8.0,
+  "asr": 3.77,
+  "trans": 1.11,
+  "e2e": 4.88,
+  "keep_up": true,
+  "en": "language English<asr_text>To be with people, and and just just the energy is different, you know. Like they could tell, and then they go like, \"Oh.\"",
+  "zh": "与人相随，能量有所不同，你明白。就像他们能讲，然后他们说：“哦。”"
+ },
+ {
+  "i": 48,
+  "dur": 8.0,
+  "asr": 3.95,
+  "trans": 1.28,
+  "e2e": 5.22,
+  "keep_up": true,
+  "en": "language English<asr_text>No wonder from Malaysia, you know they they do they give me this kind of. So they can actually tell that you're from Malaysia without you. Yeah, and probably the way.",
+  "zh": "马来西亚人，你知道他们这样做吧。这样他们就可以告诉您来自马来西亚，无需您本人。嗯，而且可能是这样。"
+ },
+ {
+  "i": 49,
+  "dur": 3.0,
+  "asr": 2.01,
+  "trans": 0.46,
+  "e2e": 2.47,
+  "keep_up": true,
+  "en": "language English<asr_text>The way I speak, also like my Malay is obviously better. They cannot.",
+  "zh": "他们无法。"
+ },
+ {
+  "i": 50,
+  "dur": 8.0,
+  "asr": 3.39,
+  "trans": 0.96,
+  "e2e": 4.35,
+  "keep_up": true,
+  "en": "language English<asr_text>Maybe, ah, ah. So I think because the fact that I could speak very fluent Malay, and then.",
+  "zh": "或许，啊啊，所以我认为是因为我能够说非常流利马来语。"
+ },
+ {
+  "i": 51,
+  "dur": 2.5,
+  "asr": 1.72,
+  "trans": 0.69,
+  "e2e": 2.41,
+  "keep_up": true,
+  "en": "language English<asr_text>They go like, \"Ah, from Malaysia, right?\" Yeah.",
+  "zh": "他们说：“啊，马来西亚，对吗？”"
+ },
+ {
+  "i": 52,
+  "dur": 5.9,
+  "asr": 2.61,
+  "trans": 0.83,
+  "e2e": 3.45,
+  "keep_up": true,
+  "en": "language English<asr_text>When you're in Singapore and the locals find out that you're from Malaysia, how do they actually react?",
+  "zh": "新加坡本地人发现你来自马来西亚时，他们如何实际反应？"
+ },
+ {
+  "i": 53,
+  "dur": 3.5,
+  "asr": 1.65,
+  "trans": 0.5,
+  "e2e": 2.15,
+  "keep_up": true,
+  "en": "language English<asr_text>They were friendly, actually.",
+  "zh": "他们确实很友好。"
+ },
+ {
+  "i": 54,
+  "dur": 6.5,
+  "asr": 2.76,
+  "trans": 0.95,
+  "e2e": 3.71,
+  "keep_up": true,
+  "en": "language English<asr_text>And also some, I think most of the Malays there can speak Malay well. So I think that's not.",
+  "zh": "马来语也有些，我认为大多数马来人可以讲马来语。所以我认为不是。"
+ },
+ {
+  "i": 55,
+  "dur": 2.5,
+  "asr": 1.46,
+  "trans": 0.41,
+  "e2e": 1.87,
+  "keep_up": true,
+  "en": "language English<asr_text>Difficult formulation being there.",
+  "zh": "语言英文"
+ },
+ {
+  "i": 56,
+  "dur": 8.0,
+  "asr": 3.49,
+  "trans": 0.96,
+  "e2e": 4.44,
+  "keep_up": true,
+  "en": "language English<asr_text>And also, most of them speak Chinese, and most of them has Malay dialect like lah and na, you know.",
+  "zh": "大多数人都说汉语，多数还使用马来语的拉哈和纳语。"
+ },
+ {
+  "i": 57,
+  "dur": 5.5,
+  "asr": 2.3,
+  "trans": 0.72,
+  "e2e": 3.02,
+  "keep_up": true,
+  "en": "language English<asr_text>Correct. Can they even tell you that you're Singaporean or Malay?",
+  "zh": "他们是否能告诉我你是新加坡人还是马来人？"
+ },
+ {
+  "i": 58,
+  "dur": 8.0,
+  "asr": 3.63,
+  "trans": 1.07,
+  "e2e": 4.7,
+  "keep_up": true,
+  "en": "language English<asr_text>They could guess me as Malaysian. Oh, okay, they can. I don't feel like I belong there. Like not much.",
+  "zh": "他们可以猜我是马来西亚人。哦，没问题，他们可以。我其实不太喜欢在那里生活。"
+ },
+ {
+  "i": 59,
+  "dur": 2.9,
+  "asr": 1.56,
+  "trans": 0.69,
+  "e2e": 2.25,
+  "keep_up": true,
+  "en": "language English<asr_text>Ah, smiles you know coming from them.",
+  "zh": "哈哈，你也从他们那儿来看到的。"
+ },
+ {
+  "i": 60,
+  "dur": 1.4,
+  "asr": 1.1,
+  "trans": 0.39,
+  "e2e": 1.49,
+  "keep_up": false,
+  "en": "language English<asr_text>Um.",
+  "zh": "Um."
+ },
+ {
+  "i": 61,
+  "dur": 7.4,
+  "asr": 3.11,
+  "trans": 1.06,
+  "e2e": 4.17,
+  "keep_up": true,
+  "en": "language English<asr_text>Yeah, I mean, they are just like very busy, just mining their own business, and you know, first of all.",
+  "zh": "嗯，我理解了。他们像很忙，自己处理自己的业务，您知道，首先。"
+ },
+ {
+  "i": 62,
+  "dur": 8.0,
+  "asr": 3.76,
+  "trans": 1.37,
+  "e2e": 5.13,
+  "keep_up": true,
+  "en": "language English<asr_text>When I speak, they don't know that I'm Malaysian because we have the same accent. But when they find out that I'm Malaysian, I am always.",
+  "zh": "当我在说话时，他们不知道我是马来亚人，因为我们有相同的发音。但一旦他们发现我是马来亚人，我都会继续这样。"
+ },
+ {
+  "i": 63,
+  "dur": 8.0,
+  "asr": 3.29,
+  "trans": 0.92,
+  "e2e": 4.21,
+  "keep_up": true,
+  "en": "language English<asr_text>They accepted, and I of course I always uphold my Malaysian identity, but they always accept me and.",
+  "zh": "他们接受了，我当然始终捍卫我的马来西亚身份，但他们总是接受我。"
+ },
+ {
+  "i": 64,
+  "dur": 8.0,
+  "asr": 3.72,
+  "trans": 0.45,
+  "e2e": 4.18,
+  "keep_up": true,
+  "en": "language English<asr_text>I blend in very well. Okay, now we're going to get slightly controversial: which, which country has better food—Singapore or?",
+  "zh": "新加坡或？"
+ },
+ {
+  "i": 65,
+  "dur": 1.4,
+  "asr": 1.15,
+  "trans": 0.4,
+  "e2e": 1.55,
+  "keep_up": false,
+  "en": "language English<asr_text>Malaysia.",
+  "zh": "马来西亚。"
+ },
+ {
+  "i": 66,
+  "dur": 5.1,
+  "asr": 2.4,
+  "trans": 0.59,
+  "e2e": 2.99,
+  "keep_up": true,
+  "en": "language English<asr_text>Okay, now I'm going to be very patriotic here. I like Malaysian food.",
+  "zh": "我非常爱国，喜欢吃马来菜。"
+ },
+ {
+  "i": 67,
+  "dur": 8.0,
+  "asr": 3.5,
+  "trans": 0.94,
+  "e2e": 4.45,
+  "keep_up": true,
+  "en": "language English<asr_text>I am an advocate of my country, Malaysia's food. Although we have the same thing in Singapore, but I think.",
+  "zh": "马来西亚的美食，我是一位倡导者。尽管我们同属于新加坡，但我想。"
+ },
+ {
+  "i": 68,
+  "dur": 7.1,
+  "asr": 2.92,
+  "trans": 0.83,
+  "e2e": 3.75,
+  "keep_up": true,
+  "en": "language English<asr_text>Ours is, you know, a notch better. And what what makes the food like different like",
+  "zh": "我们的就是，你都知道，一个更好的凹槽。不同味道的不同。"
+ },
+ {
+  "i": 69,
+  "dur": 8.0,
+  "asr": 3.68,
+  "trans": 0.76,
+  "e2e": 4.44,
+  "keep_up": true,
+  "en": "language English<asr_text>I don't know. Probably it's the preparation. I've had very good food in Singapore. I've had very good food, but some.",
+  "zh": "新加坡的准备可能不错，但有些食物质量一般。"
+ },
+ {
+  "i": 70,
+  "dur": 4.8,
+  "asr": 2.43,
+  "trans": 0.89,
+  "e2e": 3.32,
+  "keep_up": true,
+  "en": "language English<asr_text>Somehow, you know we know the best places. Being Malaysian, we know the best places here.",
+  "zh": "我们知道这里的最好地方。作为马来西亚人，我们深知这里最好的地方。"
+ },
+ {
+  "i": 71,
+  "dur": 7.4,
+  "asr": 3.05,
+  "trans": 0.76,
+  "e2e": 3.81,
+  "keep_up": true,
+  "en": "language English<asr_text>Of course, Malaysia. Okay, and why is that? Because Malaysia is for me personally because we have diverse.",
+  "zh": "马来西亚。因为马来西亚是个人选择，因为我们有多种。"
+ },
+ {
+  "i": 72,
+  "dur": 2.1,
+  "asr": 1.41,
+  "trans": 0.43,
+  "e2e": 1.84,
+  "keep_up": true,
+  "en": "language English<asr_text>People here like Indian.",
+  "zh": "印度人。"
+ },
+ {
+  "i": 73,
+  "dur": 1.9,
+  "asr": 1.1,
+  "trans": 0.38,
+  "e2e": 1.47,
+  "keep_up": true,
+  "en": "language English<asr_text>From.",
+  "zh": "从"
+ },
+ {
+  "i": 74,
+  "dur": 2.9,
+  "asr": 1.93,
+  "trans": 1.04,
+  "e2e": 2.97,
+  "keep_up": false,
+  "en": "language English<asr_text>Borneo, Sarawak, and Sabah also. So we have like.",
+  "zh": "斯里兰卡，萨马尔加和萨巴也。所以，我们有类似。"
+ },
+ {
+  "i": 75,
+  "dur": 4.2,
+  "asr": 2.02,
+  "trans": 0.65,
+  "e2e": 2.67,
+  "keep_up": true,
+  "en": "language English<asr_text>Many many types of foods, other than Singapore, but.",
+  "zh": "很多其他食物类型，除了新加坡以外。"
+ },
+ {
+  "i": 76,
+  "dur": 1.9,
+  "asr": 1.35,
+  "trans": 0.49,
+  "e2e": 1.84,
+  "keep_up": true,
+  "en": "language English<asr_text>Singapore food is so good, like.",
+  "zh": "新加坡食物很好，像。"
+ },
+ {
+  "i": 77,
+  "dur": 7.1,
+  "asr": 2.66,
+  "trans": 0.73,
+  "e2e": 3.38,
+  "keep_up": true,
+  "en": "language English<asr_text>I'll I'll not say Singapore food is not okay, but I think Malaysia food is has more in diversity and.",
+  "zh": "新加坡美食不是不可接受，但我觉得马来西亚的美食更丰富多彩。"
+ },
+ {
+  "i": 78,
+  "dur": 6.7,
+  "asr": 2.51,
+  "trans": 0.51,
+  "e2e": 3.02,
+  "keep_up": true,
+  "en": "language English<asr_text>Correct, correct. And what do you? What makes the food in Singapore different from Malaysia?",
+  "zh": "新加坡的美食与马来西亚有何区别？"
+ },
+ {
+  "i": 79,
+  "dur": 6.7,
+  "asr": 2.42,
+  "trans": 0.58,
+  "e2e": 3.01,
+  "keep_up": true,
+  "en": "language English<asr_text>I think, ah, Malaysian food is ah mostly here are traditional food.",
+  "zh": "马来西亚人这里主要是传统菜肴。"
+ },
+ {
+  "i": 80,
+  "dur": 5.0,
+  "asr": 2.31,
+  "trans": 0.73,
+  "e2e": 3.04,
+  "keep_up": true,
+  "en": "language English<asr_text>That cannot be found in almost area in like urban or city area.",
+  "zh": "该区域几乎不存在，例如在城市或市区区域。"
+ },
+ {
+  "i": 81,
+  "dur": 8.0,
+  "asr": 3.22,
+  "trans": 0.42,
+  "e2e": 3.64,
+  "keep_up": true,
+  "en": "language English<asr_text>I think because I had some of the Singaporean food, and I think that Malaysian.",
+  "zh": "马来语"
+ },
+ {
+  "i": 82,
+  "dur": 8.0,
+  "asr": 3.09,
+  "trans": 0.76,
+  "e2e": 3.86,
+  "keep_up": true,
+  "en": "language English<asr_text>Has an advantage in terms of the spice lah, spice and the herbs.",
+  "zh": "有优势，在香料、香料和草药方面。"
+ },
+ {
+  "i": 83,
+  "dur": 7.4,
+  "asr": 2.85,
+  "trans": 0.61,
+  "e2e": 3.46,
+  "keep_up": true,
+  "en": "language English<asr_text>Okay, compared to the Singapore, I do think like ah some Singaporean food is quite delicious.",
+  "zh": "新加坡的某些食物味道不错。"
+ },
+ {
+  "i": 84,
+  "dur": 8.0,
+  "asr": 3.67,
+  "trans": 0.66,
+  "e2e": 4.33,
+  "keep_up": true,
+  "en": "language English<asr_text>Okay, Indonesia is better here or there. Here, Tetere. Tetere here. Which country food is better, Singapore or Malaysia?",
+  "zh": "印尼更好还是马来西亚？新加坡还是马来西亚？"
+ },
+ {
+  "i": 85,
+  "dur": 3.4,
+  "asr": 1.73,
+  "trans": 0.62,
+  "e2e": 2.35,
+  "keep_up": true,
+  "en": "language English<asr_text>It's not biased, but honestly.",
+  "zh": "这不是偏见的，但说实话。"
+ },
+ {
+  "i": 86,
+  "dur": 4.8,
+  "asr": 2.05,
+  "trans": 0.61,
+  "e2e": 2.66,
+  "keep_up": true,
+  "en": "language English<asr_text>One because I never go to Singapore and try exactly the food.",
+  "zh": "因为我不去新加坡尝试正好食物。"
+ },
+ {
+  "i": 87,
+  "dur": 8.0,
+  "asr": 3.58,
+  "trans": 1.0,
+  "e2e": 4.57,
+  "keep_up": true,
+  "en": "language English<asr_text>And I also born here, and of course I choose Malaysian better lah. And what makes Malaysian food in your opinion better? Like.",
+  "zh": "我在这里出生，并且当然选马来西亚更好。马来西亚在你的看法中如何更好？"
+ },
+ {
+  "i": 88,
+  "dur": 2.9,
+  "asr": 1.49,
+  "trans": 0.6,
+  "e2e": 2.1,
+  "keep_up": true,
+  "en": "language English<asr_text>One is a lot of variation.",
+  "zh": "One is a lot of variation."
+ }
+]
