@@ -1,0 +1,107 @@
+[
+ {
+  "i": 1,
+  "latency_s": 0.77,
+  "tokens": 21,
+  "en": "So when you think of Singaporeans, do you feel like we are the same people?",
+  "zh": "当你说起新加坡人时，你会觉得我们是同一群人吗？"
+ },
+ {
+  "i": 2,
+  "latency_s": 0.32,
+  "tokens": 11,
+  "en": "What's the first thing that comes to your mind when you think about Singapore?",
+  "zh": "新加坡的首要是什么？"
+ },
+ {
+  "i": 3,
+  "latency_s": 0.32,
+  "tokens": 13,
+  "en": "Yeah, that's how I feel about Singapore.",
+  "zh": "是的，我对新加坡感到这样。"
+ },
+ {
+  "i": 4,
+  "latency_s": 0.32,
+  "tokens": 10,
+  "en": "Yeah, then, correct.",
+  "zh": "是的，没错。"
+ },
+ {
+  "i": 5,
+  "latency_s": 0.3,
+  "tokens": 14,
+  "en": "I I I don't know, probably it's it's the preparation.",
+  "zh": "我我我不确定，可能是准备的过程。"
+ },
+ {
+  "i": 6,
+  "latency_s": 0.3,
+  "tokens": 14,
+  "en": "And I also born here and of course I choose Malaysia better lah.",
+  "zh": "我在这里出生并选择马来西亚更合适。"
+ },
+ {
+  "i": 7,
+  "latency_s": 0.38,
+  "tokens": 19,
+  "en": "because it's, it's relatively a small country, so they always come here as a tourist.",
+  "zh": "它是一个相对小的国家，所以游客总是来此旅游。"
+ },
+ {
+  "i": 8,
+  "latency_s": 0.47,
+  "tokens": 12,
+  "en": "Distant cousins, one of us.",
+  "zh": "远房亲戚，其中一人。"
+ },
+ {
+  "i": 9,
+  "latency_s": 0.46,
+  "tokens": 14,
+  "en": "Is there something Malaysia has done better than Singapore?",
+  "zh": "马来西亚在某些方面比新加坡做得更好。"
+ },
+ {
+  "i": 10,
+  "latency_s": 0.42,
+  "tokens": 14,
+  "en": "Would you consider moving to Singapore for work?",
+  "zh": "Would you consider moving to Singapore for work?"
+ },
+ {
+  "i": 11,
+  "latency_s": 0.64,
+  "tokens": 17,
+  "en": "Uh, so yeah, it really has to be a super good uh offer to to move to Singapore.",
+  "zh": "所以，必须得是去新加坡的超级好offer。"
+ },
+ {
+  "i": 12,
+  "latency_s": 0.76,
+  "tokens": 20,
+  "en": "So the outside world might not be familiar that the Malaysia and Singapore once used to be one country until 1965.",
+  "zh": "马来西亚和新加坡在1965年曾合并为一个国家。"
+ },
+ {
+  "i": 13,
+  "latency_s": 0.42,
+  "tokens": 13,
+  "en": "And of course uh maybe their leadership also.",
+  "zh": "当然，可能他们的领导风格也会。"
+ },
+ {
+  "i": 14,
+  "latency_s": 0.53,
+  "tokens": 8,
+  "en": "It's not impossible.",
+  "zh": "不可能的。"
+ },
+ {
+  "i": 15,
+  "latency_s": 0.76,
+  "tokens": 16,
+  "en": "Look at it now, and when you come in another ten years, you'll see a different scenery over here.",
+  "zh": "看现在，十年后你会看到这里的新风景。"
+ }
+]
