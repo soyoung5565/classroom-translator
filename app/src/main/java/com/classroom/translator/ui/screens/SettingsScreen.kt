@@ -47,11 +47,7 @@ import com.classroom.translator.ui.theme.DarkOnSurfaceVariant
 import com.classroom.translator.ui.theme.DarkSurface
 import com.classroom.translator.ui.theme.DarkSurfaceVariant
 import kotlinx.coroutines.launch
-import com.classroom.translator.audio.DevTestRunner
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.compose.rememberLauncherForActivityResult
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,142 +96,17 @@ fun SettingsScreen(
                         isPassword = true,
                         onChange = { viewModel.updateSettings { s -> s.copy(asrApiKey = it) } }
                     )
+                    Text(
+                        "本地推理引擎：Qwen3-ASR-0.6B（OpenCL/GPU，端口见上方接口地址）",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                     SettingTextField(
                         label = "接口地址",
                         value = settings.asrBaseUrl,
                         onChange = { viewModel.updateSettings { s -> s.copy(asrBaseUrl = it) } }
                     )
-
-                    // ASR 引擎下拉: 三个最优引擎 (2026-09-07 大马口音混说评测)
-                    var asrExpanded by remember { mutableStateOf(false) }
-                    // 每项 (model_id, display_name, base_url, needs_force_language)
-                    // base_url 默认 8000/8001, 用户也可手动改覆盖
-                    val asrEngines = listOf(
-                        Triple("Qwen3-ASR", "Qwen3-ASR-1.7B (本地 8000, 纯英语/马来单语)", "http://127.0.0.1:8000/v1"),
-                        Triple("polyglot-lion-1.7b", "Polyglot-Lion-1.7B (本地 8001, 新马4语混说)", "http://127.0.0.1:8001/v1"),
-                        Triple("fun-asr-realtime-2026-02-28", "FunASR Realtime (云端百炼, 仅中英)", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-                        Triple("ondevice-whisper", "本机离线 whisper-small (断网可用)", ""),
-                    )
-                    ExposedDropdownMenuBox(
-                        expanded = asrExpanded,
-                        onExpandedChange = { asrExpanded = it }
-                    ) {
-                        val currentLabel = asrEngines.find { it.first == settings.asrModel }?.second
-                            ?: "自定义: ${settings.asrModel}"
-                        OutlinedTextField(
-                            value = currentLabel,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("ASR 引擎") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(asrExpanded) },
-                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
-                            colors = textFieldColors()
-                        )
-                        ExposedDropdownMenu(expanded = asrExpanded, onDismissRequest = { asrExpanded = false }) {
-                            asrEngines.forEach { (modelId, label, defaultUrl) ->
-                                DropdownMenuItem(
-                                    text = { Text(label) },
-                                    onClick = {
-                                        // 切引擎时同步更新 baseUrl (用户可在下方手动覆盖)
-                                        viewModel.updateSettings { s ->
-                                            s.copy(
-                                                asrModel = modelId,
-                                                asrBaseUrl = if (s.asrBaseUrl.contains("127.0.0.1") || s.asrBaseUrl.contains("dashscope")) defaultUrl else s.asrBaseUrl,
-                                                asrMode = if (modelId == "ondevice-whisper") "ondevice" else if (modelId.contains("fun-asr")) "dashscope" else "local_vllm"
-                                            )
-                                        }
-                                        asrExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    // ASR Mode selector
-                    var modeExpanded by remember { mutableStateOf(false) }
-                    val modes = listOf(
-                        "dashscope" to "DashScope 流式 (云端)",
-                        "local_vllm" to "本地 vLLM (Qwen3-ASR)",
-                        "mimo" to "MIMO 分段",
-                        "ondevice" to "本机离线 (断网可用)",
-                    )
-                    ExposedDropdownMenuBox(
-                        expanded = modeExpanded,
-                        onExpandedChange = { modeExpanded = it }
-                    ) {
-                        OutlinedTextField(
-                            value = modes.find { it.first == settings.asrMode }?.second ?: settings.asrMode,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("ASR模式") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(modeExpanded) },
-                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
-                            colors = textFieldColors()
-                        )
-                        ExposedDropdownMenu(expanded = modeExpanded, onDismissRequest = { modeExpanded = false }) {
-                            modes.forEach { (code, name) ->
-                                DropdownMenuItem(
-                                    text = { Text(name) },
-                                    onClick = { viewModel.updateSettings { s -> s.copy(asrMode = code) }; modeExpanded = false }
-                                )
-                            }
-                        }
-                    }
-
-                    // On-device batch test (P2 harness)
-                    var testStatus by remember { mutableStateOf("") }
-                    val testScope = rememberCoroutineScope()
-                    val testCtx = LocalContext.current
-                    val permLauncher = rememberLauncherForActivityResult(
-                        ActivityResultContracts.RequestPermission()
-                    ) { granted ->
-                        if (granted) testScope.launch {
-                            DevTestRunner.runAll(testCtx) { s -> testStatus = s }
-                        } else testStatus = "need audio permission"
-                    }
-                    Button(
-                        onClick = {
-                            permLauncher.launch(android.Manifest.permission.READ_MEDIA_AUDIO)
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                    ) { Text("机上30条实测（离线）") }
-                    if (testStatus.isNotEmpty()) Text(testStatus)
-
-                    // ===== 流式内录测试模式（真实素材端到端）=====
-                    var testPath by remember { mutableStateOf("/sdcard/Download/BV14hPxepEHY_16k.wav") }
-                    var testMsg by remember { mutableStateOf("") }
-                    // 在 Composable 作用域拿 context/activity/VM（onClick 里不能调 LocalContext）
-                    val appCtx = LocalContext.current
-                    val activity = appCtx as? android.app.Activity
-                    val testVm = (appCtx.applicationContext as com.classroom.translator.TranslatorApp).viewModel
-                    OutlinedTextField(
-                        value = testPath,
-                        onValueChange = { testPath = it },
-                        label = { Text("测试素材路径") },
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                        textStyle = MaterialTheme.typography.bodySmall,
-                        colors = textFieldColors()
-                    )
-                    Button(
-                        onClick = {
-                            if (testVm == null) { testMsg = "VM 未初始化"; return@Button }
-                            val act = activity as? com.classroom.translator.MainActivity
-                            if (act == null) { testMsg = "需要 MainActivity 上下文"; return@Button }
-                            // 记录待测素材；授权回调拿到 MediaProjection 后自动启动测试
-                            testVm.requestTestWithProjection(testPath)
-                            act.requestProjectionPermission()
-                            testMsg = "授权后自动开始测试（请允许屏幕录制）"
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
-                    ) { Text("▶ 流式内录测试（播放素材→内录→ASR→翻译）") }
-                    if (testMsg.isNotEmpty()) Text(testMsg, style = MaterialTheme.typography.bodySmall)
-                    if (testVm != null && testVm.testLatencyMs > 0) {
-                        Text(
-                            "最近延迟: ${testVm.testLatencyMs}ms",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
 
 // Language dropdown
                     var langExpanded by remember { mutableStateOf(false) }
@@ -360,54 +231,17 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            // Presets
+            // Preset: 当前方案（全本地 GPU，App 自足）
             SectionHeader("快速预设")
             Spacer(Modifier.height(8.dp))
-
-            // 预设 1: Polyglot-Lion (混说最佳, 默认推荐)
-            PresetButton("Polyglot-Lion 混说 (本地 8001, 推荐)") {
-                viewModel.updateSettings { s -> s.copy(
-                    asrBaseUrl = "http://127.0.0.1:8001/v1",
-                    asrModel = "polyglot-lion-1.7b",
-                    asrLanguage = "auto",
-                    asrMode = "local_vllm",
-                    translateBaseUrl = "http://127.0.0.1:8002/v1",
-                    translateModel = "qwen3.5-2b"
-                )}
-            }
-            // 预设 2: Qwen3-ASR (纯英语最强, 备选)
-            PresetButton("Qwen3-ASR 纯英语 (本地 8000)") {
+            PresetButton("本地 GPU 全本地（当前方案，推荐）") {
                 viewModel.updateSettings { s -> s.copy(
                     asrBaseUrl = "http://127.0.0.1:8000/v1",
                     asrModel = "Qwen3-ASR",
                     asrLanguage = "auto",
                     asrMode = "local_vllm",
                     translateBaseUrl = "http://127.0.0.1:8002/v1",
-                    translateModel = "qwen3.5-2b"
-                )}
-            }
-            PresetButton("DashScope + MiniMax-M3") {
-                viewModel.updateSettings { s -> s.copy(
-                    asrBaseUrl = "https://token-plan-cn.xiaomimimo.com/v1",
-                    asrModel = "mimo-v2.5",
-                    translateBaseUrl = "https://api.deepseek.com/v1",
-                    translateModel = "deepseek-chat"
-                )}
-            }
-            PresetButton("DashScope + MiniMax Highspeed") {
-                viewModel.updateSettings { s -> s.copy(
-                    asrBaseUrl = "https://token-plan-cn.xiaomimimo.com/v1",
-                    asrModel = "mimo-v2.5",
-                    translateBaseUrl = "https://token-plan-cn.xiaomimimo.com/v1",
-                    translateModel = "mimo-v2.5-pro"
-                )}
-            }
-            PresetButton("DashScope + DeepSeek") {
-                viewModel.updateSettings { s -> s.copy(
-                    asrBaseUrl = "https://token-plan-cn.xiaomimimo.com/v1",
-                    asrModel = "mimo-v2.5",
-                    translateBaseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1",
-                    translateModel = "qwen-plus"
+                    translateModel = "qwen3-0.6b"
                 )}
             }
         }

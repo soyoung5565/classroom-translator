@@ -82,7 +82,6 @@ fun MainScreen(
     viewModel: TranslatorViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    val testScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
     // Auto-scroll to bottom on new entries
@@ -92,32 +91,6 @@ fun MainScreen(
         }
     }
 
-    // File picker for audio import
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val filePicker = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        uri?.let {
-            try {
-                val bytes = context.contentResolver.openInputStream(it)?.readBytes()
-                var name = it.lastPathSegment ?: "audio.wav"
-                try {
-                    context.contentResolver.query(it, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
-                        if (c.moveToFirst()) {
-                            val idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                            if (idx >= 0) {
-                                val dn = c.getString(idx)
-                                if (!dn.isNullOrBlank()) name = dn
-                            }
-                        }
-                    }
-                } catch (_: Exception) { }
-                if (bytes != null) viewModel.importAudioFile(bytes, name)
-            } catch (e: Exception) {
-                viewModel.dismissError()
-            }
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -145,12 +118,7 @@ fun MainScreen(
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "设置")
                     }
-                    TextButton(onClick = { filePicker.launch(arrayOf("audio/wav", "audio/mpeg", "audio/mp3")) }) {
-                        Text("导入", color = Color.White)
-                    TextButton(onClick = { testScope.launch(Dispatchers.IO) { try { viewModel.importAudioFile(java.io.File("/sdcard/Download/phonetest/test04.wav").readBytes(), "test04.wav") } catch (_: Exception) { } } }) {
-                        Text("自测", color = Color.White)
-                    }
-                    }
+
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = DarkSurface

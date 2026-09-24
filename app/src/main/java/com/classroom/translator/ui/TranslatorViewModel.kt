@@ -83,29 +83,6 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
     @Volatile var testLatencyMs: Long = 0L; private set
     // MediaProjection（由 Activity 授权后传入）
     private var mediaProjection: android.media.projection.MediaProjection? = null
-    @Volatile private var pendingTestPath: String? = null
-    fun setMediaProjection(mp: android.media.projection.MediaProjection?) {
-        Log.i(TAG, "setMediaProjection: mp=${mp != null} pending=$pendingTestPath vm#${hashCode()}")
-        mediaProjection = mp
-        // 授权就绪时，如果有待测试素材，自动启动测试
-        if (mp != null) {
-            pendingTestPath?.let { path ->
-                pendingTestPath = null
-                startTestPlayback(path)
-            }
-        }
-    }
-    /** 设置待测试素材并请求授权（授权回来后自动开始） */
-    fun requestTestWithProjection(path: String) {
-        Log.i(TAG, "requestTestWithProjection: $path mp=${mediaProjection != null} vm#${hashCode()}")
-        pendingTestPath = path
-        // 已有投影授权时直接启动（不用再走系统向导）
-        mediaProjection?.let { mp ->
-            pendingTestPath = null
-            startTestPlayback(path)
-        }
-    }
-    fun getPlaybackRecorder(): PlaybackCaptureRecorder = playbackRecorder
 
     private var sessionStartTime: String = ""
 
@@ -136,150 +113,9 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * 测试模式：播放素材文件（系统媒体流）→ 内录（PlaybackCapture）→ 流式 ASR。
-     * 需先由 Activity 完成 MediaProjection 授权并调用 setMediaProjection。
+     * 麦克风 + 本地 llama-server（App 自己拉起，无需电脑）。
      * 声音全程走系统内部，无需外放（音量调最小也不影响测试，不打扰周围）。
      */
-    fun startTestPlayback(audioPath: String) {
-        Log.i(TAG, "startTestPlayback: path=$audioPath mp=${mediaProjection != null} vm#${hashCode()}")
-        if (_state.value.isRecording) stopRecording(releaseProj = false)  // 只清录音, 保留刚授权的投影
-        // 授权可能还在路上（用户刚点了允许，回调还没到），轮询等最多 10s
-        var mp = mediaProjection
-        if (mp == null) {
-            _state.value = _state.value.copy(status = "等待屏幕录制授权...")
-            for (i in 0 until 40) {
-                Thread.sleep(250)
-                mp = mediaProjection
-                if (mp != null) break
-            }
-        }
-        if (mp == null) {
-            _state.value = _state.value.copy(error = "测试模式需要先授予屏幕录制/内录权限")
-            return
-        }
-        val file = java.io.File(audioPath)
-        if (!file.exists()) {
-            _state.value = _state.value.copy(error = "测试素材不存在: $audioPath")
-            return
-        }
-
-        testModeActive = true
-        _state.value = _state.value.copy(isRecording = true, status = "测试播放中...", error = null, entries = emptyList())
-
-        // 1. 内录启动（抓系统媒体流）
-        playbackRecorder.setPcmListener { pcm ->
-            localVllmStream?.feedAudio(pcm)
-        }
-        playbackRecorder.start(mp)
-
-        // 2. 复用 local_vllm 流式 ASR（baseUrl 指向端侧 llama-server）
-        startTestAsrStreaming()
-
-        // 3. 播放素材
-        try {
-            mediaPlayer?.release()
-            mediaPlayer = android.media.MediaPlayer().apply {
-                setDataSource(audioPath)
-                setAudioAttributes(
-                    android.media.AudioAttributes.Builder()
-                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
-                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build()
-                )
-                setOnCompletionListener {
-                    Log.i(TAG, "Test playback finished")
-                    // 播完自动停(留 5s 排空尾部推理)。之前播完后录音循环永续:
-                    // 静音段被 6s 超时强发给 ASR -> 空转发热 + 假结果 (2026-09-22 24.8min 测试发现)
-                    kotlinx.coroutines.GlobalScope.launch(Dispatchers.Default) {
-                        delay(5000)
-                        if (testModeActive && _state.value.isRecording) {
-                            Log.i(TAG, "Test playback finished -> auto stop")
-                            stopRecording()
-                        }
-                    }
-                }
-                prepare()
-                start()
-                testPlaybackStartMs = System.currentTimeMillis()
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "MediaPlayer start failed", e)
-            _state.value = _state.value.copy(error = "播放失败: ${e.message}")
-            stopRecording()
-        }
-    }
-
-    /** 测试模式的流式 ASR：与 startLocalVllmStreaming 相同的分段循环，但指向端侧 llama-server */
-    private fun startTestAsrStreaming() {
-        val settings = _state.value.settings
-        // 测试模式固定走端侧 llama-server（127.0.0.1:8080），不依赖设置里的地址
-        val baseUrl = "http://127.0.0.1:8080/v1"
-        Log.i(TAG, "Test ASR streaming @ $baseUrl (inputAudioFormat=true, model=${settings.asrModel})")
-
-        val langArg: String? = when (settings.asrLanguage) {
-            "en" -> "English"
-            "zh" -> "Chinese"
-            else -> null
-        }
-        localVllmStream?.stop()
-        localVllmStream = LocalVllmAsrStream(
-            baseUrl = baseUrl,
-            model = settings.asrModel,
-            forceLanguage = langArg,
-            inputAudioFormat = true,   // llama-server 用 input_audio 格式
-            onResult = { text, isFinal ->
-                if (text.isBlank()) return@LocalVllmAsrStream
-                // 每句真实延迟：该句音频起点 -> 结果回来（由 LocalVllmAsrStream 统计）
-                val lat = localVllmStream?.lastLatencyMs ?: 0L
-                if (lat > 0) testLatencyMs = lat
-                Log.i(TAG, "Test ASR result ($testLatencyMs ms): $text")
-                if (isFinal) {
-                    viewModelScope.launch(Dispatchers.Default) {
-                        val chinese = try {
-                            api.translate(
-                                baseUrl = settings.translateBaseUrl,
-                                apiKey = settings.translateApiKey,
-                                model = settings.translateModel,
-                                text = text
-                            )
-                        } catch (e: Exception) { "[翻译失败: ${e.message}]" }
-                        addOrMergeEntry(text, chinese)
-                        maybeCloudOverride()  // 双翻译：每 3 条云端覆盖
-                    }
-                }
-            },
-            onError = { err ->
-                Log.e(TAG, "Test ASR error: $err")
-                _state.value = _state.value.copy(error = err)
-            },
-            onDisconnected = {
-                Log.i(TAG, "Test ASR disconnected")
-            }
-        )
-        localVllmStream?.start()
-
-        viewModelScope.launch(Dispatchers.IO) {
-            while (_state.value.isRecording && testModeActive && localVllmStream?.isActive() == true) {
-                // VAD 句末检测：每 200ms 查一次
-                delay(200)
-                if (!_state.value.isRecording || !testModeActive) break
-                val stream = localVllmStream ?: break
-                val sentenceEnd = stream.isSentenceEnd()
-                // 超时兜底：累计 ≥6s 且有过声音，强制发送（防止长句无停顿永远不发）
-                val forceTimeout = stream.bufferedMs() >= 6000L && stream.hasPendingVoice()
-                if (!sentenceEnd && !forceTimeout) continue
-                val text = try {
-                    stream.transcribePending()
-                } catch (e: Exception) {
-                    Log.e(TAG, "test transcribePending failed: ${e.message}")
-                    null
-                }
-                _state.value = _state.value.copy(
-                    status = if (!text.isNullOrBlank()) "已识别(${testLatencyMs}ms): ${text.take(30)}" else "正在听..."
-                )
-            }
-        }
-    }
-
     private fun startRecording() {
         if (!audioRecorder.hasPermission) {
             _state.value = _state.value.copy(error = "需要麦克风权限")
@@ -287,6 +123,9 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         audioRecorder.start()
+        // 【防冻结】会话期间跑前台服务：否则 App 退到后台会被 Android App Freezer 冻结，
+        // 连带 ProcessBuilder 拉起的本地推理服务一起冻住（实测：切微信后服务不再响应）
+        runCatching { com.classroom.translator.SessionForegroundService.start(getApplication()) }
         _state.value = _state.value.copy(isRecording = true, status = "正在听...", error = null)
 
         // DashScope streaming mode
@@ -527,11 +366,13 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         )
         localVllmStream?.start()
 
-        // 分段发送循环：每 2 秒把累积音频送去转写
+        // 分段发送循环（2026-09-24 改）：等到「句末」或「缓冲满 8 秒」才发送整段，
+        // 避免把半句切碎送 ASR 造成内容丢失（实测覆盖率 53% -> 目标 90%+）
         viewModelScope.launch(Dispatchers.IO) {
             while (_state.value.isRecording && localVllmStream?.isActive() == true) {
-                delay(LocalVllmAsrStream.FLUSH_INTERVAL_MS)
+                delay(300)
                 if (!_state.value.isRecording) break
+                if (localVllmStream?.shouldFlush() != true) continue
                 val text = try {
                     localVllmStream?.transcribePending()
                 } catch (e: Exception) {
@@ -560,6 +401,8 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         dashScopeStream = null
         localVllmStream?.stop()
         localVllmStream = null
+        // 会话结束：停掉前台服务（不再保活）
+        runCatching { com.classroom.translator.SessionForegroundService.stop(getApplication()) }
         // 通知本地服务管理器：会话结束（无前台界面则自动释放，省内存/降温）
         runCatching { LocalLlmServerManager.get(getApplication()).onSessionEnd() }
         audioRecorder.setPcmListener(null)
@@ -578,7 +421,6 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         // 释放 MediaProjection + 停掉内录前台服务
         // （之前全项目没有任何地方释放它——授权一次后前台服务永远活着，
         //   系统持续捕获音频 = 翻译停了手机还在耗电发热，2026-09-22 发现）
-        // startTestPlayback 内部的自清理走 releaseProj=false, 否则会把刚授权的投影干掉
         if (releaseProj) releaseProjection()
 
         _state.value = _state.value.copy(
@@ -666,66 +508,6 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun importAudioFile(audioBytes: ByteArray, fileName: String) {
-        val settings = _state.value.settings
-        if (settings.asrApiKey.isBlank()) {
-            _state.value = _state.value.copy(error = "请先设置API密钥")
-            return
-        }
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.Default) {
-            _state.value = _state.value.copy(isProcessing = true, status = "正在识别: $fileName")
-            try {
-                val sniffed = AudioConverter.sniffFormat(audioBytes)
-                val needsConvert = sniffed == null && AudioConverter.needsConversion(fileName)
-                val (audioData, format) = if (sniffed != null) {
-                    Log.i(TAG, "Import  sniffed as , sending directly")
-                    Pair(audioBytes, sniffed)
-                } else if (needsConvert) {
-                    Log.i(TAG, "Converting $fileName to WAV...")
-                    val converted = AudioConverter.convertToWav(getApplication(), audioBytes, fileName)
-                    if (converted == null) {
-                        _state.value = _state.value.copy(isProcessing = false, status = "就绪", error = "不支持的音频格式: $fileName")
-                        return@launch
-                    }
-                    Pair(converted, "wav")
-                } else if (fileName.endsWith(".mp3")) {
-                    Pair(audioBytes, "mp3")
-                } else {
-                    Pair(audioBytes, "wav")
-                }
-                val english = if (settings.asrMode == "ondevice") {
-                    val lang = if (settings.asrLanguage == "ms") "ms" else "en"
-                    val r = OfflineAsrEngine.transcribe(getApplication(), audioData, "whisper-small", lang)
-                    val rtf = if (r.audioSec > 0) r.elapsedMs / 1000.0 / r.audioSec else 0.0
-                    Log.i(TAG, "Offline " + r.audioSec + "s -> '" + r.text.take(60) + "' (" + r.elapsedMs + "ms)")
-                    _state.value = _state.value.copy(status = "离线识别: " + fileName)
-                    r.text
-                } else {
-                    val audioBase64 = Base64.encodeToString(audioData, Base64.NO_WRAP)
-                    api.transcribeAudio(
-                    baseUrl = settings.asrBaseUrl, apiKey = settings.asrApiKey,
-                    model = settings.asrModel, audioBase64 = audioBase64,
-                    format = format, language = settings.asrLanguage
-                )
-                }
-                if (english.isBlank()) {
-                    _state.value = _state.value.copy(isProcessing = false, status = "就绪", error = "文件无语音内容")
-                    return@launch
-                }
-                _state.value = _state.value.copy(status = "正在翻译...")
-                val chinese = try {
-                    api.translate(baseUrl = settings.translateBaseUrl, apiKey = settings.translateApiKey,
-                        model = settings.translateModel, text = english)
-                } catch (e: Exception) { "[翻译失败: ${e.message}]" }
-                val entry = TranslationEntry(english = english, chinese = chinese)
-                _state.value = _state.value.copy(entries = _state.value.entries + entry, isProcessing = false, status = "就绪")
-                autoSave(entry)
-            } catch (e: Exception) {
-                Log.e(TAG, "Import failed", e)
-                _state.value = _state.value.copy(isProcessing = false, status = "就绪", error = "导入失败: ${e.message}")
-            }
-        }
-    }
     /**
      * 整课录音转录：上传到本地 VibeVoice HTTP 服务，逐段翻译，生成双语字幕。
      * @param serverUrl 例 http://192.168.1.249:8001

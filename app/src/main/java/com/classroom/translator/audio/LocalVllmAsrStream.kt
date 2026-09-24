@@ -27,7 +27,7 @@ import kotlin.math.sqrt
  * 而不是孤立 2s 硬切。
  *
  * 防卡死（2026-09-11 修，24.8min 真机实测暴露）：
- * - 前缀只带滑动窗口（最近 MAX_PREFIX_CHARS 字符），禁止全量累积；
+ * - 每段独立送 ASR（不带历史前缀，避免重复吐前缀/截断）；
  * - 单段音频硬上限 MAX_SEGMENT_MS，超出部分留在缓冲下轮再送。
  */
 class LocalVllmAsrStream(
@@ -52,9 +52,7 @@ class LocalVllmAsrStream(
         // ===== 前缀续听防卡死 =====
         // 前缀只带最近 N 字符（滑动窗口），禁止全量累积——
         // 全量前缀会把 llama-server(-c 4096) 上下文灌满，单次推理从 1s 膨胀到 22+ 分钟。
-        private const val MAX_PREFIX_CHARS = 400
         // 累积全文内存保护（只用于存盘/UI，不再参与请求）
-        private const val MAX_ACCUMULATED_CHARS = 20000
         // 单段音频硬上限 8s：推理慢时新音频会继续进缓冲，超过 8s 的部分
         // 留在缓冲下轮再送，防止"推理越慢→缓冲越长→推理更慢"死亡螺旋。
         private const val MAX_SEGMENT_MS = 8000L
@@ -72,8 +70,6 @@ class LocalVllmAsrStream(
     @Volatile private var lastVoiceMs: Long = 0L     // 最近一次有声音的时间
     @Volatile private var hasVoice = false           // 当前段是否已捕获过声音
 
-    /** 已识别全文（前缀，供模型续听） */
-    @Volatile private var accumulatedText = ""
     /** 最近一次转写的延迟（段起点 -> 结果回来），ms */
     @Volatile var lastLatencyMs: Long = 0L; private set
 
@@ -116,6 +112,19 @@ class LocalVllmAsrStream(
         return silence >= MIN_SILENCE_MS && segmentMs >= MIN_SEGMENT_MS
     }
 
+    /**
+     * 是否该把当前缓冲送 ASR（2026-09-24 改）：
+     *  - 检测到句末（静音 >= MIN_SILENCE_MS）
+     *  - 或缓冲已达单段上限 MAX_SEGMENT_MS（长句切分硬上限）
+     * 这样每段都是"完整句子 / 满 8 秒"，避免每 2 秒发半句造成碎片化与内容丢失。
+     */
+    fun shouldFlush(): Boolean {
+        if (!isActive) return false
+        if (!hasVoice) return false
+        if (isSentenceEnd()) return true
+        return bufferedMs() >= MAX_SEGMENT_MS
+    }
+
     /** 当前缓冲音频时长 ms */
     fun bufferedMs(): Long {
         synchronized(pcmBuffer) { return System.currentTimeMillis() - pcmStartMs }
@@ -137,7 +146,6 @@ class LocalVllmAsrStream(
     fun stop() {
         isActive = false
         synchronized(pcmBuffer) { pcmBuffer.reset() }
-        accumulatedText = ""
         onDisconnected()
     }
 
@@ -172,8 +180,8 @@ class LocalVllmAsrStream(
         val wav = WavEncoder.encode(pcm)  // 16k mono 16bit WAV
         val b64 = Base64.encodeToString(wav, Base64.NO_WRAP)
         val dataUri = "data:audio/wav;base64,$b64"
-        // 前缀：只带最近 MAX_PREFIX_CHARS 字符（滑动窗口），禁止全量累积
-        val prefix = accumulatedText.trim().takeLast(MAX_PREFIX_CHARS).trim()
+        // 不再带历史文本前缀（2026-09-24 实测：前缀会让模型重复吐前缀、截断新内容，
+        // 导致实时覆盖率仅 53%，而去掉前缀后同一录音离线跑覆盖率达 94.7%）
 
         try {
             val payload = JSONObject().apply {
@@ -183,7 +191,6 @@ class LocalVllmAsrStream(
                         put("role", "user")
                         val textContent = buildString {
                             if (forceLanguage != null) append("language $forceLanguage<asr_text>")
-                            if (prefix.isNotEmpty()) append(prefix)
                         }
                         put("content", JSONArray().apply {
                             if (textContent.isNotEmpty()) {
@@ -233,19 +240,11 @@ class LocalVllmAsrStream(
             val cleaned = cleanAsrOutput(content)
             if (cleaned.isBlank()) return@withContext null
 
-            // 增量提取：输出可能 = 前缀 + 增量，剥掉前缀
-            val cleanedNorm = cleaned.trim()
-            val prefixNorm = prefix.trim()
-            val delta: String = extractDelta(prefixNorm, cleanedNorm)
-
-            // 累积全文（内存保护：只保留最近 MAX_ACCUMULATED_CHARS）
+            // 无前缀模式：输出即本段完整转写
+            val delta: String = cleaned.trim()
             if (delta.isNotEmpty()) {
-                accumulatedText = (accumulatedText + " " + delta).trim()
-                if (accumulatedText.length > MAX_ACCUMULATED_CHARS) {
-                    accumulatedText = accumulatedText.takeLast(MAX_ACCUMULATED_CHARS)
-                }
                 if (segStartMs > 0) lastLatencyMs = System.currentTimeMillis() - segStartMs
-                Log.i(TAG, "ASR delta(${lastLatencyMs}ms): $delta")
+                Log.i(TAG, "ASR(${lastLatencyMs}ms): $delta")
                 onResult(delta, true)
             }
             delta
@@ -254,41 +253,6 @@ class LocalVllmAsrStream(
             onError("识别失败: ${e.message}")
             null
         }
-    }
-
-    /**
-     * 从"前缀+增量"输出中剥出增量。
-     * 1) 精确前缀匹配
-     * 2) 词级 tail-head 对齐（模型轻微改写也能对上）
-     * 3) 字符级最长匹配片段
-     * 4) 与前缀高度重叠(>80% 词重复) 视为无新增，返回空串避免重复条目
-     * 2026-09-23: 之前固定取前缀最后 20 字符匹配，模型整段重写时兜底"整段当增量"，
-     * 24.8min 实测 104 段里 18 段整段重发、5 条重复条目。
-     */
-    internal fun extractDelta(prefixNorm: String, cleanedNorm: String): String {
-        if (prefixNorm.isEmpty()) return cleanedNorm
-        if (cleanedNorm.startsWith(prefixNorm)) return cleanedNorm.substring(prefixNorm.length).trim()
-
-        val pw = prefixNorm.split(Regex("\\s+")).filter { it.isNotEmpty() }
-        val cw = cleanedNorm.split(Regex("\\s+")).filter { it.isNotEmpty() }
-        // 2) 词级: prefix 尾部 k 词 == cleaned 开头 k 词
-        val maxK = minOf(pw.size, cw.size, 40)
-        var k = maxK
-        while (k >= 3) {
-            if (pw.takeLast(k) == cw.take(k)) return cw.drop(k).joinToString(" ").trim()
-            k--
-        }
-        // 3) 字符级: prefix 尾部最长片段在 cleaned 中出现
-        var cl = minOf(prefixNorm.length, 120)
-        while (cl >= 12) {
-            val idx = cleanedNorm.lastIndexOf(prefixNorm.takeLast(cl))
-            if (idx >= 0) return cleanedNorm.substring(idx + cl).trim()
-            cl -= 6
-        }
-        // 4) 高度重叠 => 模型重写同一段, 无新内容
-        val overlap = cw.count { it in pw }
-        if (cw.isNotEmpty() && overlap.toDouble() / cw.size > 0.8) return ""
-        return cleanedNorm
     }
 
     /** 剥离 Qwen3-ASR 输出的 language 前缀 / 特殊 token */
