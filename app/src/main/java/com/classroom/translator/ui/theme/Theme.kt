@@ -46,7 +46,10 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun TranslatorTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    // 2026-09-24 redesign: dynamicColor disabled to enforce BrandSeed violet across all Android versions.
+    // Material You would otherwise hijack the palette with the system wallpaper's tones, hiding the design
+    // intent (and making A/B comparisons vs old build impossible).
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current

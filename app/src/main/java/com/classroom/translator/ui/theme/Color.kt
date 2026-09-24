@@ -28,13 +28,13 @@ import androidx.compose.ui.graphics.Color
  */
 
 // Brand seed used by ColorScheme.fromSeed in Theme.kt for non-dynamic fallback.
-internal val BrandSeed = Color(0xFF4A6FE5) // calm teaching-blue
+internal val BrandSeed = Color(0xFF8B5CF6) // 2026-09-24 redesign - vibrant violet for clear visual distinction
 
 // Dark scheme colors (Material 3 tonal palette tones 0-100)
-internal val DarkPrimary             = Color(0xFFB6C5FF)
-internal val DarkOnPrimary           = Color(0xFF1F2D78)
-internal val DarkPrimaryContainer    = Color(0xFF39468F)
-internal val DarkOnPrimaryContainer  = Color(0xFFDEE1FF)
+internal val DarkPrimary             = Color(0xFFD7BBFB) // tonal palette from BrandSeed 0xFF8B5CF6 tone 80
+internal val DarkOnPrimary           = Color(0xFF381E72) // tone 10
+internal val DarkPrimaryContainer    = Color(0xFF4F378B) // tone 30
+internal val DarkOnPrimaryContainer  = Color(0xFFEADDFF) // tone 90
 
 internal val DarkSecondary           = Color(0xFFBEC6DC)
 internal val DarkOnSecondary         = Color(0xFF293041)
@@ -67,13 +67,13 @@ internal val DarkOutline             = Color(0xFF8F909A)
 internal val DarkOutlineVariant      = Color(0xFF45464F)
 internal val DarkInverseSurface      = Color(0xFFE3E2E9)
 internal val DarkInverseOnSurface    = Color(0xFF2E2F36)
-internal val DarkInversePrimary      = Color(0xFF4A6FE5)
+internal val DarkInversePrimary      = Color(0xFF8B5CF6) // BrandSeed violet for inverse
 
 // Light scheme colors (for future light mode support)
-internal val LightPrimary             = Color(0xFF2B4BC7)
+internal val LightPrimary             = Color(0xFF6750A4) // tonal palette from BrandSeed light tone 40
 internal val LightOnPrimary           = Color(0xFFFFFFFF)
-internal val LightPrimaryContainer    = Color(0xFFDEE1FF)
-internal val LightOnPrimaryContainer  = Color(0xFF001454)
+internal val LightPrimaryContainer    = Color(0xFFEADDFF) // tone 90
+internal val LightOnPrimaryContainer  = Color(0xFF21005D) // tone 10
 
 internal val LightSecondary           = Color(0xFF595D72)
 internal val LightOnSecondary         = Color(0xFFFFFFFF)
@@ -106,7 +106,7 @@ internal val LightOutline             = Color(0xFF767680)
 internal val LightOutlineVariant      = Color(0xFFC6C5D0)
 internal val LightInverseSurface      = Color(0xFF2E2F36)
 internal val LightInverseOnSurface    = Color(0xFFF1EFF5)
-internal val LightInversePrimary      = Color(0xFFB6C5FF)
+internal val LightInversePrimary      = Color(0xFFD0BCFF) // tone 80
 
 // Compatibility aliases - existing Screen code references these names.
 // Kept so legacy code paths still compile. New code must use
