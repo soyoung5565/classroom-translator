@@ -50,3 +50,31 @@ Android 10+ 的 W^X 限制：App **不能执行自己可写目录**里的文件�
 - 首次冷启动需 10-30 秒加载模型（可选：进 App 即预热）
 - 模型与二进制仍是一次性安装写入（不是每次上课的需求）
 - 未做：开机自启（App 不常驻，用户开 App 即用，符合"上课打开就能用"）
+
+## 本轮修复（端到端验收中发现）
+
+### 修复 1：ASR 请求格式（致命）
+`LocalVllmAsrStream` 的 `inputAudioFormat` 默认是 `false`（vLLM 的 `audio_url` 格式），而主流程 `startLocalVllmStreaming()` 没传该参数 → 发 `audio_url` → llama-server **源码里根本没有 audio_url 分支**（只有 image_url / input_audio / input_video|video_url / text）→ HTTP 400 `unsupported content[].type`。
+- 修：主流程显式传 `inputAudioFormat = true`，并把默认值也改成 `true`（本地后端固定 llama-server）
+
+### 修复 2：看门狗误判导致重复启动
+模型加载需 ~19 秒，期间 `/health` 未就绪，看门狗每 10 秒巡检时会误判"掉线"再起一个实例 → 第二个绑定同一端口必然失败退出。
+- 修：加 `LOAD_GRACE_MS = 90s` 宽限期 —— 进程还活着且在宽限期内一律不重启
+
+### 新增：App 打开即预热
+`MainActivity.onCreate` 读设置后调用 `prewarm()`（非阻塞），模型在用户点「开始」前就加载完毕；退到后台且无会话时照常释放。
+
+## 验证结果（2026-09-24 晚，全部实测）
+| 验收项 | 结果 |
+|---|---|
+| 服务由 App 拉起（非 adb） | ✅ 进程属主 `u0_a459`、ppid = App 进程 |
+| 真实转写 | ✅ 界面出条目、ASR 日志 task 正常、**无 400** |
+| 掉线自愈 | ✅ 强杀两服务 → **15 秒**自动恢复 |
+| 会话中切微信 | ✅ 微信前台 30s，服务保持 2/2 不被掐断 |
+| 重复启动 | ✅ 修复后稳定 2 进程 |
+| force-stop 行为 | ✅ 子进程随 App 一起被杀（同 cgroup） |
+| 重启后基线 | ✅ 零服务、零残留 |
+
+## 已知限制
+- **重启后首次解锁前 App 无法启动**（Android `RUNNING_LOCKED` / Direct Boot 机制）→ 用户解锁手机后打开 App 即可，符合"上课不需要电脑"。
+- `run-as` 的 `runas_app` 上下文被 FUSE 挡在 `/sdcard` 外（调试局限，真实 App 无此问题）。

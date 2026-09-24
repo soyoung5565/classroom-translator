@@ -36,7 +36,7 @@ class LocalVllmAsrStream(
     // null = auto（让模型自动检测语言，支持马来+英语+中文混说）
     private val forceLanguage: String? = null,
     // true = llama-server (llama.cpp) 用 input_audio 格式; false = vLLM 用 audio_url 格式
-    private val inputAudioFormat: Boolean = false,
+    private val inputAudioFormat: Boolean = true,   // 本地后端固定是 llama-server，只支持 input_audio
     private val onResult: (text: String, isFinal: Boolean) -> Unit,
     private val onError: (String) -> Unit,
     private val onDisconnected: () -> Unit = {}

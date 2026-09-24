@@ -498,6 +498,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
             baseUrl = baseUrl,
             model = settings.asrModel,
             forceLanguage = langArg,
+            inputAudioFormat = true,   // 本地后端是 llama-server，只认 input_audio（audio_url 会 400）
             onResult = { text, isFinal ->
                 if (text.isBlank()) return@LocalVllmAsrStream
                 Log.i(TAG, "vLLM result: $text (final=$isFinal)")

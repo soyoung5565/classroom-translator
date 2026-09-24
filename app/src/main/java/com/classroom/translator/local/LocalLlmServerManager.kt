@@ -28,6 +28,7 @@ class LocalLlmServerManager private constructor(private val app: Application) {
         private const val ASR_MMPROJ = "mmproj-Qwen3-ASR-0.6B-Q8_0.gguf"
         private const val TRANS_MODEL = "Qwen3-0.6B-Q4_K_M.gguf"
         private const val WATCH_MS = 10_000L
+        private const val LOAD_GRACE_MS = 90_000L   // 模型加载宽限期：期间即使 /health 未就绪也不算掉线
         private const val KILL_BG_DELAY_MS = 8_000L
 
         @Volatile private var instance: LocalLlmServerManager? = null
@@ -40,6 +41,8 @@ class LocalLlmServerManager private constructor(private val app: Application) {
     // ---- 进程状态 ----
     @Volatile private var asrProc: Process? = null
     @Volatile private var transProc: Process? = null
+    @Volatile private var asrStartedAt = 0L
+    @Volatile private var transStartedAt = 0L
     @Volatile private var asrPort = 8080
     @Volatile private var transPort = 8002
     @Volatile private var wantRunning = false
@@ -80,8 +83,8 @@ class LocalLlmServerManager private constructor(private val app: Application) {
             Log.e(TAG, "$lastError: bin=${binFile.exists()} dir=$modelDir")
             return false
         }
-        if (!healthy(transPort)) transProc = spawn(transArgs(), "trans.log")
-        if (!healthy(asrPort)) asrProc = spawn(asrArgs(), "asr.log")
+        if (!healthy(transPort)) { transProc = spawn(transArgs(), "trans.log"); transStartedAt = System.currentTimeMillis() }
+        if (!healthy(asrPort)) { asrProc = spawn(asrArgs(), "asr.log"); asrStartedAt = System.currentTimeMillis() }
         startWatchdog()
         if (!blockUntilReady) return true
         val deadline = System.currentTimeMillis() + 120_000
@@ -91,6 +94,21 @@ class LocalLlmServerManager private constructor(private val app: Application) {
         }
         lastError = "本地服务启动超时"
         return false
+    }
+
+    /**
+     * 预热：App 一打开就后台把服务拉起来（不阻塞 UI）。
+     * 用户点「开始」时模型已加载完毕 → 立刻可用。退到后台且无会话时照常释放。
+     */
+    fun prewarm(asrUrl: String?, transUrl: String?) {
+        if (wantRunning) return                 // 已在跑（可能有活跃会话）→ 不重复
+        Thread {
+            runCatching {
+                start(asrUrl, transUrl, blockUntilReady = false)
+                sessionActive = false          // 预热不算会话：退后台仍会释放
+                scheduleStopIfIdle()
+            }
+        }.also { it.isDaemon = true; it.start() }
     }
 
     /** 翻译会话结束：若无前台界面则释放服务（会话中切微信不会被掐断） */
@@ -175,13 +193,20 @@ class LocalLlmServerManager private constructor(private val app: Application) {
             while (wantRunning) {
                 try { Thread.sleep(WATCH_MS) } catch (e: InterruptedException) { break }
                 if (!wantRunning) break
-                if (!healthy(transPort)) {
+                val now = System.currentTimeMillis()
+                // 关键：进程还活着且在「模型加载宽限期」内 → 判定为"还在加载"，绝不重启
+                // （否则会重复起第二个实例去抢同一个端口，后起的必然绑定失败退出）
+                val transLoading = transProc?.isAlive == true && now - transStartedAt < LOAD_GRACE_MS
+                val asrLoading = asrProc?.isAlive == true && now - asrStartedAt < LOAD_GRACE_MS
+                if (!healthy(transPort) && !transLoading) {
                     Log.w(TAG, "翻译服务掉线 -> 重启")
                     transProc = spawn(transArgs(), "trans.log")
+                    transStartedAt = now
                 }
-                if (!healthy(asrPort)) {
+                if (!healthy(asrPort) && !asrLoading) {
                     Log.w(TAG, "ASR 服务掉线 -> 重启")
                     asrProc = spawn(asrArgs(), "asr.log")
+                    asrStartedAt = now
                 }
             }
         }.also { it.isDaemon = true; it.start() }
