@@ -13,3 +13,4 @@ test.wav
 hs_err_*.log
 replay_*.log
 build_apk.cmd
+tools/screen*.png

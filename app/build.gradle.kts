@@ -51,6 +51,14 @@ android {
         jvmTarget = "17"
     }
 
+    // [手机自足] llama-server 以 lib*.so 形式放进 jniLibs，必须解压到 nativeLibraryDir 才能被 App 执行
+    // （Android 10+ 禁止执行 App 可写目录中的文件，nativeLibraryDir 只读且 SELinux 允许执行）
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     buildFeatures {
         compose = true
         buildConfig = true

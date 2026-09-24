@@ -10,6 +10,7 @@ import com.classroom.translator.audio.AudioRecorder
 import com.classroom.translator.audio.WavEncoder
 import com.classroom.translator.audio.DashScopeAsrStream
 import com.classroom.translator.audio.LocalVllmAsrStream
+import com.classroom.translator.local.LocalLlmServerManager
 import com.classroom.translator.audio.PlaybackCaptureRecorder
 import com.classroom.translator.audio.AudioConverter
 import com.classroom.translator.data.AppSettings
@@ -295,8 +296,26 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         // Local vLLM (Qwen3-ASR) sentence-level streaming mode
+        // [手机自足] 本地推理服务由 App 自己拉起（无需电脑/adb）；首次冷启动加载模型约 10-30 秒
         if (_state.value.settings.asrMode == "local_vllm") {
-            startLocalVllmStreaming()
+            val s0 = _state.value.settings
+            _state.value = _state.value.copy(status = "正在启动本地推理服务（首次约 10-30 秒）…")
+            viewModelScope.launch(Dispatchers.IO) {
+                val mgr = LocalLlmServerManager.get(getApplication())
+                val ok = mgr.start(s0.asrBaseUrl, s0.translateBaseUrl, blockUntilReady = true)
+                withContext(Dispatchers.Main) {
+                    if (ok) {
+                        Log.i(TAG, "本地服务就绪: " + mgr.statusText())
+                        startLocalVllmStreaming()
+                    } else {
+                        Log.e(TAG, "本地服务启动失败: " + mgr.statusText())
+                        _state.value = _state.value.copy(
+                            status = "本地服务启动失败",
+                            error = "本地推理服务启动失败：" + mgr.statusText()
+                        )
+                    }
+                }
+            }
             return
         }
 
@@ -540,6 +559,8 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         dashScopeStream = null
         localVllmStream?.stop()
         localVllmStream = null
+        // 通知本地服务管理器：会话结束（无前台界面则自动释放，省内存/降温）
+        runCatching { LocalLlmServerManager.get(getApplication()).onSessionEnd() }
         audioRecorder.setPcmListener(null)
         val audioPath = audioRecorder.getAudioFilePath()
         audioRecorder.stop()
