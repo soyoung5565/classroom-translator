@@ -31,10 +31,19 @@ echo "=== build ==="
 "$CMAKE" --build "$BUILD" --target llama-server -j 8
 
 echo "=== strip ==="
-cp "$BUILD/bin/llama-server" "$BUILD/bin/llama-server.stripped"
-"$STRIP" --strip-unneeded "$BUILD/bin/llama-server.stripped" || echo "(strip skipped)"
+# 注意: MSYS 的 cp 要用 /d/ 风格路径, 而原生 exe(llvm-strip/readelf) 要用 D:/ 风格 —— 混用会报 No such file
+MSYS_BUILD="/d/llama.cpp/build-android-opencl-static"
+cp "$MSYS_BUILD/bin/llama-server" "$MSYS_BUILD/bin/llama-server.stripped"
+"$STRIP" --strip-unneeded "D:/llama.cpp/build-android-opencl-static/bin/llama-server.stripped" || echo "(strip skipped)"
 
 echo "=== size ==="
 ls -la "$BUILD/bin/llama-server" "$BUILD/bin/llama-server.stripped" 2>/dev/null
 echo "=== NEEDED (should be system libs only) ==="
 "$READELF" -d "$BUILD/bin/llama-server.stripped" 2>/dev/null | grep NEEDED || echo "(n/a)"
+
+echo "=== 放入 jniLibs ==="
+DST="/d/classroom-translator/app/src/main/jniLibs/arm64-v8a"
+mkdir -p "$DST"
+cp "$MSYS_BUILD/bin/llama-server.stripped" "$DST/libllamasrv.so"
+ls -la "$DST/libllamasrv.so"
+echo "完成: 可直接 gradle assembleDebug"
