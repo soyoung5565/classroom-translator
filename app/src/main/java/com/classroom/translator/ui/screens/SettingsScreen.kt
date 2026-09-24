@@ -23,7 +23,6 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -40,20 +39,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.classroom.translator.ui.TranslatorViewModel
-import com.classroom.translator.ui.theme.Blue500
-import com.classroom.translator.ui.theme.DarkOnSurfaceVariant
-import com.classroom.translator.ui.theme.DarkSurface
-import com.classroom.translator.ui.theme.DarkSurfaceVariant
-import kotlinx.coroutines.launch
-import androidx.compose.runtime.rememberCoroutineScope
 
+/**
+ * Settings screen. All colors / typography / shapes from MaterialTheme tokens.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    viewModel: TranslatorViewModel
+    viewModel: TranslatorViewModel,
 ) {
     val state by viewModel.state.collectAsState()
     val settings = state.settings
@@ -61,59 +58,78 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("设置", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        "设置",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = DarkSurface
-                )
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                ),
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(16.dp),
         ) {
-            // ASR Section
             SectionHeader("语音识别（ASR）")
             Spacer(Modifier.height(8.dp))
 
             Card(
-                colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                modifier = Modifier.fillMaxWidth()
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     SettingTextField(
                         label = "密钥",
                         value = settings.asrApiKey,
                         isPassword = true,
-                        onChange = { viewModel.updateSettings { s -> s.copy(asrApiKey = it) } }
+                        onChange = { viewModel.updateSettings { s -> s.copy(asrApiKey = it) } },
                     )
                     Text(
                         "本地推理引擎：Qwen3-ASR-0.6B（OpenCL/GPU，端口见上方接口地址）",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 4.dp)
+                        modifier = Modifier.padding(top = 4.dp),
                     )
                     SettingTextField(
                         label = "接口地址",
                         value = settings.asrBaseUrl,
-                        onChange = { viewModel.updateSettings { s -> s.copy(asrBaseUrl = it) } }
+                        onChange = { viewModel.updateSettings { s -> s.copy(asrBaseUrl = it) } },
                     )
 
-// Language dropdown
                     var langExpanded by remember { mutableStateOf(false) }
-                    val languages = listOf("en" to "英语（English）", "zh" to "中文", "ms" to "马来语（Malay）", "auto" to "自动检测")
+                    val languages = listOf(
+                        "en" to "英语（English）",
+                        "zh" to "中文",
+                        "ms" to "马来语（Malay）",
+                        "auto" to "自动检测",
+                    )
                     ExposedDropdownMenuBox(
                         expanded = langExpanded,
-                        onExpandedChange = { langExpanded = it }
+                        onExpandedChange = { langExpanded = it },
                     ) {
                         OutlinedTextField(
                             value = languages.find { it.first == settings.asrLanguage }?.second ?: settings.asrLanguage,
@@ -121,17 +137,23 @@ fun SettingsScreen(
                             readOnly = true,
                             label = { Text("识别语种") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(langExpanded) },
-                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth().padding(top = 8.dp),
-                            colors = textFieldColors()
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
+                            colors = textFieldColors(),
                         )
-                        ExposedDropdownMenu(expanded = langExpanded, onDismissRequest = { langExpanded = false }) {
+                        ExposedDropdownMenu(
+                            expanded = langExpanded,
+                            onDismissRequest = { langExpanded = false },
+                        ) {
                             languages.forEach { (code, name) ->
                                 DropdownMenuItem(
                                     text = { Text(name) },
                                     onClick = {
                                         viewModel.updateSettings { s -> s.copy(asrLanguage = code) }
                                         langExpanded = false
-                                    }
+                                    },
                                 )
                             }
                         }
@@ -139,56 +161,65 @@ fun SettingsScreen(
                 }
             }
 
-            // 云端翻译 (流式后覆盖 / 双端矫正) - 默认值编译进 BuildConfig,用户可改
             Spacer(Modifier.height(16.dp))
             SectionHeader("云端翻译 (M3 默认, 覆盖本地翻译)")
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+            ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     SettingTextField(
                         label = "云端密钥",
                         value = settings.cloudApiKey,
                         isPassword = true,
-                        onChange = { viewModel.updateSettings { s -> s.copy(cloudApiKey = it) } }
+                        onChange = { viewModel.updateSettings { s -> s.copy(cloudApiKey = it) } },
                     )
                     SettingTextField(
                         label = "云端接口地址",
                         value = settings.cloudBaseUrl,
-                        onChange = { viewModel.updateSettings { s -> s.copy(cloudBaseUrl = it) } }
+                        onChange = { viewModel.updateSettings { s -> s.copy(cloudBaseUrl = it) } },
                     )
                     SettingTextField(
                         label = "云端模型",
                         value = settings.cloudModel,
-                        onChange = { viewModel.updateSettings { s -> s.copy(cloudModel = it) } }
+                        onChange = { viewModel.updateSettings { s -> s.copy(cloudModel = it) } },
                     )
                     Text(
                         "默认值由 BuildConfig 注入,无需填即可使用 M3 直连 minimaxi.com",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
             Spacer(Modifier.height(20.dp))
 
-            // Translation Section
             SectionHeader("翻译（大模型）")
             Spacer(Modifier.height(8.dp))
 
             Card(
-                colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                modifier = Modifier.fillMaxWidth()
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     SettingTextField(
                         label = "密钥",
                         value = settings.translateApiKey,
                         isPassword = true,
-                        onChange = { viewModel.updateSettings { s -> s.copy(translateApiKey = it) } }
+                        onChange = { viewModel.updateSettings { s -> s.copy(translateApiKey = it) } },
                     )
                     SettingTextField(
                         label = "接口地址",
                         value = settings.translateBaseUrl,
-                        onChange = { viewModel.updateSettings { s -> s.copy(translateBaseUrl = it) } }
+                        onChange = { viewModel.updateSettings { s -> s.copy(translateBaseUrl = it) } },
                     )
 
                     var transExpanded by remember { mutableStateOf(false) }
@@ -197,11 +228,11 @@ fun SettingsScreen(
                         "minimax-m3" to "MiniMax M3",
                         "kimi-k3" to "Kimi K3",
                         "glm-5.2" to "GLM 5.2",
-                        "qwen3.8-max" to "Qwen3.8 Max"
+                        "qwen3.8-max" to "Qwen3.8 Max",
                     )
                     ExposedDropdownMenuBox(
                         expanded = transExpanded,
-                        onExpandedChange = { transExpanded = it }
+                        onExpandedChange = { transExpanded = it },
                     ) {
                         OutlinedTextField(
                             value = settings.translateModel,
@@ -209,17 +240,22 @@ fun SettingsScreen(
                             readOnly = true,
                             label = { Text("模型") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(transExpanded) },
-                            modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
-                            colors = textFieldColors()
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth(),
+                            colors = textFieldColors(),
                         )
-                        ExposedDropdownMenu(expanded = transExpanded, onDismissRequest = { transExpanded = false }) {
+                        ExposedDropdownMenu(
+                            expanded = transExpanded,
+                            onDismissRequest = { transExpanded = false },
+                        ) {
                             transModels.forEach { (id, name) ->
                                 DropdownMenuItem(
                                     text = { Text(name) },
                                     onClick = {
                                         viewModel.updateSettings { s -> s.copy(translateModel = id) }
                                         transExpanded = false
-                                    }
+                                    },
                                 )
                             }
                         }
@@ -227,11 +263,8 @@ fun SettingsScreen(
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
-
             Spacer(Modifier.height(24.dp))
 
-            // Preset: 当前方案（全本地 GPU，App 自足）
             SectionHeader("快速预设")
             Spacer(Modifier.height(8.dp))
             PresetButton("本地 GPU 全本地（当前方案，推荐）") {
@@ -241,8 +274,8 @@ fun SettingsScreen(
                     asrLanguage = "auto",
                     asrMode = "local_vllm",
                     translateBaseUrl = "http://127.0.0.1:8002/v1",
-                    translateModel = "qwen3-0.6b"
-                )}
+                    translateModel = "qwen3-0.6b",
+                ) }
             }
         }
     }
@@ -254,8 +287,8 @@ private fun SectionHeader(title: String) {
         title,
         style = MaterialTheme.typography.titleSmall,
         fontWeight = FontWeight.Bold,
-        color = Blue500,
-        modifier = Modifier.padding(bottom = 4.dp)
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(bottom = 4.dp),
     )
 }
 
@@ -264,28 +297,28 @@ private fun SettingTextField(
     label: String,
     value: String,
     isPassword: Boolean = false,
-    onChange: (String) -> Unit
+    onChange: (String) -> Unit,
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onChange,
         label = { Text(label) },
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-        visualTransformation = if (isPassword) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+        visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
         keyboardOptions = if (isPassword) KeyboardOptions(keyboardType = KeyboardType.Password) else KeyboardOptions.Default,
         singleLine = true,
-        colors = textFieldColors()
+        colors = textFieldColors(),
     )
 }
 
 @Composable
 private fun textFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = Blue500,
-    unfocusedBorderColor = DarkOnSurfaceVariant.copy(alpha = 0.3f),
-    focusedLabelColor = Blue500,
-    cursorColor = Blue500,
-    focusedContainerColor = DarkSurface,
-    unfocusedContainerColor = DarkSurface,
+    focusedBorderColor = MaterialTheme.colorScheme.primary,
+    unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+    focusedLabelColor = MaterialTheme.colorScheme.primary,
+    cursorColor = MaterialTheme.colorScheme.primary,
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
 )
 
 @Composable
@@ -294,10 +327,10 @@ private fun PresetButton(label: String, onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = DarkSurfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurface
-        )
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
     ) {
-        Text(label)
+        Text(label, style = MaterialTheme.typography.labelLarge)
     }
 }

@@ -2,6 +2,7 @@ package com.classroom.translator.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FileOpen
@@ -39,22 +39,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.classroom.translator.ui.TranslatorViewModel
-import com.classroom.translator.ui.theme.Blue500
-import com.classroom.translator.ui.theme.DarkOnSurfaceVariant
-import com.classroom.translator.ui.theme.DarkSurface
-import com.classroom.translator.ui.theme.DarkSurfaceVariant
 
 /**
- * 整课录音转录页面：选择整节课录音 → 上传到本地 VibeVoice 服务 → 双语字幕。
+ * Whole-session transcription screen. All colors / typography / shapes from
+ * MaterialTheme tokens.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WholeSessionScreen(
     onBack: () -> Unit,
-    viewModel: TranslatorViewModel = viewModel()
+    viewModel: TranslatorViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -62,7 +58,7 @@ fun WholeSessionScreen(
     var selectedName by remember { mutableStateOf<String?>(null) }
 
     val filePicker = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
     ) { uri ->
         uri?.let {
             try {
@@ -83,36 +79,55 @@ fun WholeSessionScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("整课转录", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("录音 → 本地ASR → 双语字幕", style = MaterialTheme.typography.labelSmall, color = DarkOnSurfaceVariant)
+                        Text(
+                            "整课转录",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            "录音 -> 本地ASR -> 双语字幕",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = DarkSurface)
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                ),
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(12.dp))
 
-            // 服务地址输入
             OutlinedTextField(
                 value = serverUrl,
                 onValueChange = { serverUrl = it },
                 label = { Text("转录服务地址") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
             )
             Spacer(Modifier.height(8.dp))
 
-            // 选择音频
             Button(onClick = {
                 filePicker.launch(arrayOf("audio/wav", "audio/mpeg", "audio/mp3", "audio/x-m4a", "audio/aac", "audio/*"))
             }) {
@@ -123,47 +138,53 @@ fun WholeSessionScreen(
 
             if (state.isProcessing) {
                 Spacer(Modifier.height(24.dp))
-                CircularProgressIndicator(color = Blue500)
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(12.dp))
-                Text(state.status, color = DarkOnSurfaceVariant)
+                Text(state.status, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else if (selectedName != null && state.entries.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
-                Text("「$selectedName」转写完成 ${state.entries.size} 段", color = DarkOnSurfaceVariant)
+                Text(
+                    "\u300C$selectedName\u300D转写完成 ${state.entries.size} 段",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
 
             Spacer(Modifier.height(12.dp))
 
-            // 双语字幕列表
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(state.entries) { entry ->
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = DarkSurfaceVariant),
-                        shape = RoundedCornerShape(12.dp)
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        shape = MaterialTheme.shapes.medium,
                     ) {
                         Column(Modifier.padding(12.dp)) {
                             Text(
                                 entry.timestamp,
-                                fontSize = 11.sp,
-                                color = Blue500,
-                                fontWeight = FontWeight.Medium
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium,
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 entry.english,
                                 style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.SemiBold,
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 entry.chinese,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = DarkOnSurfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 3,
-                                overflow = TextOverflow.Ellipsis
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
