@@ -29,8 +29,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.Stop
@@ -414,7 +414,7 @@ private fun MainEmptyState() {
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Rounded.GraphicEq,
+                    Icons.Outlined.GraphicEq,
                     contentDescription = null,
                     modifier = Modifier.size(38.dp),
                     tint = cs.primary,
@@ -694,7 +694,7 @@ private fun FinishPill(onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp),
     ) {
-        Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(17.dp), tint = cs.primary)
+        Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(17.dp), tint = cs.primary)
         Spacer(Modifier.width(6.dp))
         Text(
             "完成",

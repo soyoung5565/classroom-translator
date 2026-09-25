@@ -31,19 +31,19 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.HistoryEdu
-import androidx.compose.material.icons.rounded.IosShare
-import androidx.compose.material.icons.rounded.MenuBook
-import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.HistoryEdu
+import androidx.compose.material.icons.outlined.IosShare
+import androidx.compose.material.icons.outlined.MenuBook
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -512,7 +512,7 @@ private fun HistoryCard(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Icons.Rounded.MenuBook,
+                Icons.Outlined.MenuBook,
                 contentDescription = null,
                 tint = cs.primary,
                 modifier = Modifier.size(21.dp),
@@ -597,7 +597,7 @@ private fun EmptyHistory(onNavigateToRecording: () -> Unit) {
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Rounded.HistoryEdu,
+                    Icons.Outlined.HistoryEdu,
                     contentDescription = null,
                     tint = cs.primary,
                     modifier = Modifier.size(38.dp),
@@ -630,7 +630,7 @@ private fun EmptyHistory(onNavigateToRecording: () -> Unit) {
                     .padding(horizontal = 20.dp),
             ) {
                 Icon(
-                    Icons.Rounded.Mic,
+                    Icons.Outlined.Mic,
                     contentDescription = null,
                     tint = cs.primary,
                     modifier = Modifier.size(18.dp),
@@ -717,7 +717,7 @@ private fun DetailAppBar(
     ) {
         IconButton(onClick = onBack) {
             Icon(
-                Icons.AutoMirrored.Rounded.ArrowBack,
+                Icons.AutoMirrored.Outlined.ArrowBack,
                 contentDescription = "返回",
                 tint = cs.onSurfaceVariant,
                 modifier = Modifier.size(22.dp),
@@ -734,7 +734,7 @@ private fun DetailAppBar(
         )
         IconButton(onClick = onShare) {
             Icon(
-                Icons.Rounded.IosShare,
+                Icons.Outlined.IosShare,
                 contentDescription = "分享",
                 tint = cs.onSurfaceVariant,
                 modifier = Modifier.size(22.dp),
@@ -743,7 +743,7 @@ private fun DetailAppBar(
         if (onDownload != null) {
             IconButton(onClick = onDownload) {
                 Icon(
-                    Icons.Rounded.Download,
+                    Icons.Outlined.Download,
                     contentDescription = "下载",
                     tint = cs.onSurfaceVariant,
                     modifier = Modifier.size(22.dp),
@@ -842,7 +842,7 @@ private fun PlayerRow(audioPath: String) {
             Spacer(Modifier.width(4.dp))
             IconButton(onClick = { player?.pause(); isPlaying = false }) {
                 Icon(
-                    Icons.Rounded.Pause,
+                    Icons.Outlined.Pause,
                     contentDescription = "暂停",
                     tint = cs.onSurfaceVariant,
                     modifier = Modifier.size(22.dp),
@@ -853,7 +853,7 @@ private fun PlayerRow(audioPath: String) {
                 isPlaying = false; positionMs = 0L
             }) {
                 Icon(
-                    Icons.Rounded.Stop,
+                    Icons.Outlined.Stop,
                     contentDescription = "停止",
                     tint = cs.onSurfaceVariant,
                     modifier = Modifier.size(22.dp),

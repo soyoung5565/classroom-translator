@@ -19,9 +19,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.CloudDone
-import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.CloudDone
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -104,7 +104,7 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     // ── 语音识别 ─────────────────────────────
-                    GroupHeader(icon = Icons.Rounded.GraphicEq, title = "语音识别", code = "ASR")
+                    GroupHeader(icon = Icons.Outlined.GraphicEq, title = "语音识别", code = "ASR")
                     ItemCard(name = "识别语种", desc = "自动检测源语言，可选课堂常见语种") {
                         SegRow(
                             options = LangOptions,
@@ -128,7 +128,7 @@ fun SettingsScreen(
 
                     Spacer(Modifier.height(0.dp))
                     // ── 云端翻译 ─────────────────────────────
-                    GroupHeader(icon = Icons.Rounded.CloudDone, title = "云端翻译", code = "CLOUD")
+                    GroupHeader(icon = Icons.Outlined.CloudDone, title = "云端翻译", code = "CLOUD")
                     ItemCard(name = "接口地址", desc = "默认值由 BuildConfig 注入，无需填写即可使用") {
                         FieldBox(
                             value = settings.cloudBaseUrl,
@@ -151,7 +151,7 @@ fun SettingsScreen(
 
                     Spacer(Modifier.height(0.dp))
                     // ── 大模型翻译 ───────────────────────────
-                    GroupHeader(icon = Icons.Rounded.AutoAwesome, title = "大模型翻译", code = "LLM")
+                    GroupHeader(icon = Icons.Outlined.AutoAwesome, title = "大模型翻译", code = "LLM")
                     ItemCard(name = "模型档位", desc = "本地模型免费 · 云端模型按量计费") {
                         SegWrap(
                             options = ModelOptions,
