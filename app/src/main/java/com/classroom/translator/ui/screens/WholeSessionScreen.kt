@@ -1,5 +1,6 @@
 package com.classroom.translator.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -43,8 +45,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.classroom.translator.ui.TranslatorViewModel
 
 /**
- * Whole-session transcription screen. All colors / typography / shapes from
- * MaterialTheme tokens.
+ * Whole-session transcription screen - 2026-09-25 B-direction redesign.
+ * Server address input + file picker + transcription status + bilingual
+ * subtitle list on pure white/black backgrounds. Interactions preserved.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,6 +59,7 @@ fun WholeSessionScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     var serverUrl by remember { mutableStateOf("http://192.168.1.249:8001") }
     var selectedName by remember { mutableStateOf<String?>(null) }
+    val cs = MaterialTheme.colorScheme
 
     val filePicker = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
@@ -81,14 +85,13 @@ fun WholeSessionScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             "整课转录",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = cs.onSurface,
                         )
                         Text(
                             "录音 -> 本地ASR -> 双语字幕",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = cs.onSurfaceVariant,
                         )
                     }
                 },
@@ -97,17 +100,17 @@ fun WholeSessionScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "返回",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            tint = cs.onSurfaceVariant,
                         )
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    containerColor = cs.background,
+                    titleContentColor = cs.onSurface,
                 ),
             )
         },
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = cs.background,
     ) { padding ->
         Column(
             modifier = Modifier
@@ -126,11 +129,18 @@ fun WholeSessionScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
 
-            Button(onClick = {
-                filePicker.launch(arrayOf("audio/wav", "audio/mpeg", "audio/mp3", "audio/x-m4a", "audio/aac", "audio/*"))
-            }) {
+            Button(
+                onClick = {
+                    filePicker.launch(arrayOf("audio/wav", "audio/mpeg", "audio/mp3", "audio/x-m4a", "audio/aac", "audio/*"))
+                },
+                modifier = Modifier.padding(horizontal = 16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = cs.primary,
+                    contentColor = cs.onPrimary,
+                ),
+            ) {
                 Icon(Icons.Default.FileOpen, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("选择整课录音")
@@ -138,14 +148,14 @@ fun WholeSessionScreen(
 
             if (state.isProcessing) {
                 Spacer(Modifier.height(24.dp))
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                CircularProgressIndicator(color = cs.primary)
                 Spacer(Modifier.height(12.dp))
-                Text(state.status, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(state.status, color = cs.onSurfaceVariant)
             } else if (selectedName != null && state.entries.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "\u300C$selectedName\u300D转写完成 ${state.entries.size} 段",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = cs.primary,
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -155,21 +165,22 @@ fun WholeSessionScreen(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(state.entries) { entry ->
                     Card(
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            containerColor = cs.surfaceContainer,
+                            contentColor = cs.onSurface,
                         ),
                         shape = MaterialTheme.shapes.medium,
+                        border = BorderStroke(1.dp, cs.outlineVariant.copy(alpha = 0.35f)),
                     ) {
-                        Column(Modifier.padding(12.dp)) {
+                        Column(Modifier.padding(14.dp)) {
                             Text(
                                 entry.timestamp,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                color = cs.primary,
                                 fontWeight = FontWeight.Medium,
                             )
                             Spacer(Modifier.height(4.dp))
@@ -177,12 +188,13 @@ fun WholeSessionScreen(
                                 entry.english,
                                 style = MaterialTheme.typography.bodyLarge,
                                 fontWeight = FontWeight.SemiBold,
+                                color = cs.onSurface,
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 entry.chinese,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = cs.onSurfaceVariant,
                                 maxLines = 3,
                                 overflow = TextOverflow.Ellipsis,
                             )

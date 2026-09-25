@@ -3,35 +3,29 @@ package com.classroom.translator.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Material 3 tonal palette fallback colors.
+ * Material 3 tonal palette colors - 2026-09-25 B-direction redesign (dual theme).
  *
- * Per Material 3 design system spec (m3.material.io):
- * - Dark scheme uses tonal palette tones 0-100 where lower tone = darker surface.
- * - Light scheme uses tonal palette tones 0-100 where higher tone = lighter surface.
- * - These hex values were generated via the official M3 ColorScheme.fromSeed
- *   algorithm with seedColor = Color(0xFF4A6FE5) (a calm teaching-blue).
+ * User-confirmed requirements:
+ * - Light mode scaffold background = pure white 0xFFFFFFFF
+ * - Dark mode scaffold background = pure black 0xFF000000 (OLED power saving)
+ * - App follows system dark/light auto-switch via isSystemInDarkTheme() (Theme.kt)
+ * - All colors derived from brand seed 0xFF8B5CF6 (oklch 0.606 0.25 292.72)
+ * - Gradient accent endpoints: dark mode uses bright tones (tone 80),
+ *   light mode uses deep tones (tone 40) for contrast.
  *
- * When dynamicColor is enabled on Android 12+, the dynamicLight/DarkColorScheme()
- * functions in Theme.kt take over and these are unused. They exist so:
- *   1) Pre-Android-12 devices still get a designed dark mode
- *   2) Users who opt out of dynamic color get a coherent brand palette
- *
- * Per the Material 3 skill (hamen/material-3-skill):
- *   - primary / on-primary - High-emphasis fills, text, icons against surface
- *   - secondary / on-secondary - Less prominent accents (filter chips, tonal buttons)
- *   - tertiary / on-tertiary - Contrasting accent (badges, complementary containers)
- *   - surface-container-lowest/low/default/high/highest - 5-level hierarchy
- *   - outline / outline-variant - Important vs decorative boundaries
+ * Per Material 3 spec (m3.material.io):
+ * - Cards keep their surfaceContainer fill on both pure backgrounds; hierarchy comes
+ *   from the 5-level container scale (never hardcode these in Screen files).
  *
  * Do not introduce new hardcoded hex values in Screen files. Use
  * MaterialTheme.colorScheme.{role} or MaterialTheme.shapes.{token} instead.
  */
 
 // Brand seed used by ColorScheme.fromSeed in Theme.kt for non-dynamic fallback.
-internal val BrandSeed = Color(0xFF8B5CF6) // 2026-09-24 redesign - vibrant violet for clear visual distinction
+internal val BrandSeed = Color(0xFF8B5CF6)
 
-// Dark scheme colors (Material 3 tonal palette tones 0-100)
-internal val DarkPrimary             = Color(0xFFD7BBFB) // tonal palette from BrandSeed 0xFF8B5CF6 tone 80
+// Dark scheme colors (Material 3 tonal palette tones 0-100, surface pinned to pure black)
+internal val DarkPrimary             = Color(0xFFD7BBFB) // tone 80 - bright violet, gradient endpoint (dark)
 internal val DarkOnPrimary           = Color(0xFF381E72) // tone 10
 internal val DarkPrimaryContainer    = Color(0xFF4F378B) // tone 30
 internal val DarkOnPrimaryContainer  = Color(0xFFEADDFF) // tone 90
@@ -41,7 +35,7 @@ internal val DarkOnSecondary         = Color(0xFF293041)
 internal val DarkSecondaryContainer  = Color(0xFF3F4759)
 internal val DarkOnSecondaryContainer= Color(0xFFDAE2F9)
 
-internal val DarkTertiary            = Color(0xFFDDBDE2)
+internal val DarkTertiary            = Color(0xFFDDBDE2) // tone 80 - bright plum, gradient endpoint (dark)
 internal val DarkOnTertiary          = Color(0xFF3F2843)
 internal val DarkTertiaryContainer   = Color(0xFF573E5B)
 internal val DarkOnTertiaryContainer = Color(0xFFFAD7FC)
@@ -51,26 +45,27 @@ internal val DarkOnError             = Color(0xFF690005)
 internal val DarkErrorContainer      = Color(0xFF93000A)
 internal val DarkOnErrorContainer    = Color(0xFFFFDAD6)
 
-internal val DarkBackground          = Color(0xFF121318)
+internal val DarkBackground          = Color(0xFF000000) // pure black - user requirement (OLED)
 internal val DarkOnBackground        = Color(0xFFE3E2E9)
-internal val DarkSurface             = Color(0xFF121318)
+internal val DarkSurface             = Color(0xFF000000) // pure black - user requirement (OLED)
 internal val DarkOnSurface           = Color(0xFFE3E2E9)
 internal val DarkOnSurfaceVariant    = Color(0xFFC5C6D7)
 
-internal val DarkSurfaceContainerLowest  = Color(0xFF0C0E13)
-internal val DarkSurfaceContainerLow     = Color(0xFF1A1B21)
-internal val DarkSurfaceContainer        = Color(0xFF1E2025)
-internal val DarkSurfaceContainerHigh    = Color(0xFF292A30)
-internal val DarkSurfaceContainerHighest = Color(0xFF34353C)
+// Container scale on pure black: subtle steps, never muddy grey wash
+internal val DarkSurfaceContainerLowest  = Color(0xFF0A0A0C)
+internal val DarkSurfaceContainerLow     = Color(0xFF131316)
+internal val DarkSurfaceContainer        = Color(0xFF17171A)
+internal val DarkSurfaceContainerHigh    = Color(0xFF1E1E22)
+internal val DarkSurfaceContainerHighest = Color(0xFF26262B)
 
 internal val DarkOutline             = Color(0xFF8F909A)
-internal val DarkOutlineVariant      = Color(0xFF45464F)
+internal val DarkOutlineVariant      = Color(0xFF43444B) // hairline borders on pure black
 internal val DarkInverseSurface      = Color(0xFFE3E2E9)
 internal val DarkInverseOnSurface    = Color(0xFF2E2F36)
 internal val DarkInversePrimary      = Color(0xFF8B5CF6) // BrandSeed violet for inverse
 
-// Light scheme colors (for future light mode support)
-internal val LightPrimary             = Color(0xFF6750A4) // tonal palette from BrandSeed light tone 40
+// Light scheme colors (surface pinned to pure white)
+internal val LightPrimary             = Color(0xFF6750A4) // tone 40 - deep violet, gradient endpoint (light)
 internal val LightOnPrimary           = Color(0xFFFFFFFF)
 internal val LightPrimaryContainer    = Color(0xFFEADDFF) // tone 90
 internal val LightOnPrimaryContainer  = Color(0xFF21005D) // tone 10
@@ -80,7 +75,7 @@ internal val LightOnSecondary         = Color(0xFFFFFFFF)
 internal val LightSecondaryContainer  = Color(0xFFDEE2F9)
 internal val LightOnSecondaryContainer= Color(0xFF161B2C)
 
-internal val LightTertiary            = Color(0xFF735471)
+internal val LightTertiary            = Color(0xFF735471) // tone 40 - deep plum, gradient endpoint (light)
 internal val LightOnTertiary          = Color(0xFFFFFFFF)
 internal val LightTertiaryContainer   = Color(0xFFFAD7FC)
 internal val LightOnTertiaryContainer = Color(0xFF2A1130)
@@ -90,17 +85,17 @@ internal val LightOnError             = Color(0xFFFFFFFF)
 internal val LightErrorContainer      = Color(0xFFFFDAD6)
 internal val LightOnErrorContainer    = Color(0xFF410002)
 
-internal val LightBackground          = Color(0xFFFEFBFF)
+internal val LightBackground          = Color(0xFFFFFFFF) // pure white - user requirement
 internal val LightOnBackground        = Color(0xFF1B1B21)
-internal val LightSurface             = Color(0xFFFEFBFF)
+internal val LightSurface             = Color(0xFFFFFFFF) // pure white - user requirement
 internal val LightOnSurface           = Color(0xFF1B1B21)
 internal val LightOnSurfaceVariant    = Color(0xFF46464F)
 
-internal val LightSurfaceContainerLowest  = Color(0xFFFFFFFF)
-internal val LightSurfaceContainerLow     = Color(0xFFF6F4FA)
-internal val LightSurfaceContainer        = Color(0xFFF1EFF5)
-internal val LightSurfaceContainerHigh    = Color(0xFFEBE9EF)
-internal val LightSurfaceContainerHighest = Color(0xFFE5E3EA)
+internal val LightSurfaceContainerLowest  = Color(0xFFF9F8FB)
+internal val LightSurfaceContainerLow     = Color(0xFFF3F1F7)
+internal val LightSurfaceContainer        = Color(0xFFEEECF3)
+internal val LightSurfaceContainerHigh    = Color(0xFFE8E6EE)
+internal val LightSurfaceContainerHighest = Color(0xFFE2E0E8)
 
 internal val LightOutline             = Color(0xFF767680)
 internal val LightOutlineVariant      = Color(0xFFC6C5D0)

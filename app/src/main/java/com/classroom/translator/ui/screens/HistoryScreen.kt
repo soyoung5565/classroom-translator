@@ -2,6 +2,8 @@ package com.classroom.translator.ui.screens
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,11 +20,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -34,6 +46,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -46,6 +59,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,7 +70,11 @@ import com.classroom.translator.data.TranslationSession
 
 /**
  * History (sessions list) screen + session detail screen.
+ * 2026-09-25 B-direction redesign: pure white/black backgrounds, gradient
+ * accents on primary actions, subject chip on session cards, dual-theme safe.
  * All colors / typography / shapes from MaterialTheme tokens.
+ * Interactions preserved verbatim: SessionCard click -> detail, share/delete
+ * buttons, whole-session entry, MediaPlayer play/pause/stop/seek, recording export.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,8 +97,8 @@ fun HistoryScreen(
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        "课堂翻译",
-                        style = MaterialTheme.typography.titleLarge,
+                        "历史记录",
+                        style = MaterialTheme.typography.headlineMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                 },
@@ -87,7 +106,7 @@ fun HistoryScreen(
                     TextButton(onClick = onNavigateToWholeSession) {
                         Text(
                             "整课转录",
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = MaterialTheme.colorScheme.primary,
                             style = MaterialTheme.typography.labelLarge,
                         )
                     }
@@ -100,16 +119,25 @@ fun HistoryScreen(
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
                 ),
             )
         },
         floatingActionButton = {
+            // Gradient leaf FAB matching MainScreen idle state
+            val cs = MaterialTheme.colorScheme
+            val gradient = Brush.linearGradient(listOf(cs.primary, cs.tertiary))
+            val fabShape = androidx.compose.foundation.shape.RoundedCornerShape(
+                topStart = 28.dp, topEnd = 12.dp,
+                bottomEnd = 28.dp, bottomStart = 12.dp,
+            )
             FloatingActionButton(
                 onClick = onNavigateToRecording,
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.background(gradient, fabShape),
+                shape = fabShape,
+                containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                contentColor = cs.onPrimary,
             ) {
                 Icon(
                     imageVector = Icons.Default.Mic,
@@ -128,10 +156,20 @@ fun HistoryScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "\uD83D\uDCDD",
-                        style = MaterialTheme.typography.displayMedium,
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(96.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.secondaryContainer),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.History,
+                            contentDescription = "暂无记录",
+                            modifier = Modifier.size(44.dp),
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
                     Spacer(Modifier.height(16.dp))
                     Text(
                         "还没有翻译记录，点击下方按钮开始",
@@ -146,8 +184,8 @@ fun HistoryScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .padding(horizontal = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(vertical = 12.dp),
             ) {
                 items(sessions, key = { it.id }) { session ->
                     SessionCard(
@@ -172,15 +210,17 @@ private fun SessionCard(
     onDelete: () -> Unit,
     onExport: () -> Unit,
 ) {
+    val cs = MaterialTheme.colorScheme
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            contentColor = MaterialTheme.colorScheme.onSurface,
+            containerColor = cs.surfaceContainer,
+            contentColor = cs.onSurface,
         ),
         shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, cs.outlineVariant.copy(alpha = 0.35f)),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -190,23 +230,29 @@ private fun SessionCard(
             ) {
                 Text(
                     text = session.date,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = cs.onSurface,
                 )
-                Text(
-                    text = "${session.startTime} - ${session.endTime}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                // Subject chip (class tag)
+                Box(
+                    modifier = Modifier
+                        .background(cs.primary.copy(alpha = 0.14f), MaterialTheme.shapes.small)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        "英语课",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = cs.primary,
+                    )
+                }
             }
 
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(6.dp))
 
             Text(
-                text = "${session.entryCount} 段翻译",
+                text = "${session.startTime} - ${session.endTime} · ${session.entryCount} 段翻译",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.tertiary,
+                color = cs.onSurfaceVariant,
             )
 
             if (session.summary.isNotBlank()) {
@@ -214,7 +260,7 @@ private fun SessionCard(
                 Text(
                     text = session.summary,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = cs.onSurfaceVariant.copy(alpha = 0.8f),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -225,16 +271,23 @@ private fun SessionCard(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextButton(onClick = onExport) {
-                    Text("分享", color = MaterialTheme.colorScheme.primary)
+                    Icon(
+                        Icons.Default.Share,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = cs.primary,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text("分享", color = cs.primary)
                 }
-                Spacer(Modifier.width(4.dp))
                 IconButton(onClick = onDelete) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "删除",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = cs.onSurfaceVariant,
                     )
                 }
             }
@@ -263,9 +316,8 @@ fun SessionDetailScreen(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            "课堂翻译",
+                            "会话详情",
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         if (s != null) {
@@ -278,11 +330,11 @@ fun SessionDetailScreen(
                     }
                 },
                 navigationIcon = {
-                    TextButton(onClick = onBack) {
-                        Text(
-                            "返回",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.labelLarge,
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 },
@@ -294,7 +346,7 @@ fun SessionDetailScreen(
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
                 ),
             )
@@ -326,27 +378,60 @@ fun SessionDetailScreen(
                                 }
                             }
                         }
+                        val cs = MaterialTheme.colorScheme
+                        // Player card: gradient accent on icon, tonal surface
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                containerColor = cs.surfaceContainer,
+                                contentColor = cs.onSurface,
                             ),
                             shape = MaterialTheme.shapes.medium,
+                            border = BorderStroke(1.dp, cs.outlineVariant.copy(alpha = 0.35f)),
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    "Recording ${sizeKB}KB",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Spacer(Modifier.height(4.dp))
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                Brush.linearGradient(listOf(cs.primary, cs.tertiary))
+                                            ),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            Icons.Default.GraphicEq,
+                                            contentDescription = null,
+                                            tint = cs.onPrimary,
+                                            modifier = Modifier.size(22.dp),
+                                        )
+                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            "课堂录音",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = cs.onSurface,
+                                        )
+                                        Text(
+                                            "%d:%02d".format(totalDuration / 1000 / 60, totalDuration / 1000 % 60),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = cs.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.height(8.dp))
                                 Slider(
                                     value = currentPosition.toFloat(),
                                     onValueChange = { isSeeking = true; currentPosition = it.toInt() },
                                     onValueChangeFinished = { player?.seekTo(currentPosition); isSeeking = false },
                                     valueRange = 0f..totalDuration.toFloat().coerceAtLeast(1f),
                                     modifier = Modifier.fillMaxWidth(),
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = cs.primary,
+                                        activeTrackColor = cs.primary,
+                                    ),
                                 )
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -355,20 +440,21 @@ fun SessionDetailScreen(
                                     Text(
                                         "%d:%02d".format(currentPosition / 1000 / 60, currentPosition / 1000 % 60),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = cs.onSurfaceVariant,
                                     )
                                     Text(
                                         "%d:%02d".format(totalDuration / 1000 / 60, totalDuration / 1000 % 60),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = cs.onSurfaceVariant,
                                     )
                                 }
                                 Spacer(Modifier.height(4.dp))
                                 Row(
                                     horizontalArrangement = Arrangement.Center,
                                     modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    TextButton(onClick = {
+                                    IconButton(onClick = {
                                         if (isPlaying) { player?.pause(); isPlaying = false }
                                         else {
                                             if (player == null) {
@@ -380,12 +466,24 @@ fun SessionDetailScreen(
                                                 } catch (e: Exception) { android.util.Log.e("History", "Play failed", e) }
                                             } else { player?.start(); isPlaying = true }
                                         }
-                                    }) { Text(if (isPlaying) "Pause" else "Play", color = MaterialTheme.colorScheme.primary) }
-                                    Spacer(Modifier.width(16.dp))
-                                    TextButton(onClick = {
+                                    }) {
+                                        Icon(
+                                            if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                            contentDescription = if (isPlaying) "暂停" else "播放",
+                                            tint = cs.primary,
+                                        )
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    IconButton(onClick = {
                                         player?.stop(); player?.release(); player = null; isPlaying = false; currentPosition = 0
-                                    }) { Text("Stop", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                                    Spacer(Modifier.width(16.dp))
+                                    }) {
+                                        Icon(
+                                            Icons.Default.Stop,
+                                            contentDescription = "停止",
+                                            tint = cs.onSurfaceVariant,
+                                        )
+                                    }
+                                    Spacer(Modifier.width(12.dp))
                                     TextButton(onClick = {
                                         try {
                                             val exportDir = java.io.File(context.getExternalFilesDir(null), "exports"); exportDir.mkdirs()
@@ -398,79 +496,60 @@ fun SessionDetailScreen(
                                             }
                                             context.startActivity(android.content.Intent.createChooser(intent, "Export Recording"))
                                         } catch (e: Exception) { android.util.Log.e("History", "Export failed", e) }
-                                    }) { Text("Export Audio", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                    }) { Text("导出录音", color = cs.onSurfaceVariant) }
                                 }
                             }
                         }
                     } else {
                         Text(
-                            "Recording not found",
+                            "录音文件不存在",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
                         )
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(12.dp))
                 }
                 Text(
-                    "${s.startTime} - ${s.endTime}  共${s.entries.size}段",
-                    style = MaterialTheme.typography.bodyMedium,
+                    "${s.date} · ${s.startTime} - ${s.endTime} · ${s.entries.size} 段",
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(Modifier.height(16.dp))
-
-                Text(
-                    "English",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    s.entries.joinToString(" ") { it.english },
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Spacer(Modifier.height(20.dp))
-
-                Text(
-                    "中文翻译",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    s.entries.joinToString("") { it.chinese },
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-
-                Spacer(Modifier.height(24.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 Spacer(Modifier.height(12.dp))
-
-                Text(
-                    "详细条目",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
                 for (entry in s.entries) {
+                    val cs = MaterialTheme.colorScheme
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
+                            containerColor = cs.surfaceContainer,
+                            contentColor = cs.onSurface,
                         ),
                         shape = MaterialTheme.shapes.small,
+                        border = BorderStroke(1.dp, cs.outlineVariant.copy(alpha = 0.3f)),
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text(entry.english, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                entry.timestamp,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = cs.primary,
+                            )
                             Spacer(Modifier.height(4.dp))
-                            Text(entry.chinese, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                            Text(
+                                entry.english,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = cs.onSurface,
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                entry.chinese,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = cs.onSurfaceVariant,
+                            )
                         }
                     }
                 }
+
+
             }
         } else {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

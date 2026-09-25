@@ -3,6 +3,7 @@ package com.classroom.translator.ui.screens
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,9 +19,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Mic
@@ -52,6 +54,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.classroom.translator.ui.TranslationEntry
@@ -60,8 +64,14 @@ import com.classroom.translator.ui.TranslatorViewModel
 import kotlinx.coroutines.delay
 
 /**
- * Main recording screen. All colors / typography / shapes come from
- * MaterialTheme tokens - no hardcoded hex. See Color.kt + Theme.kt for tokens.
+ * Main recording screen - 2026-09-25 B-direction redesign ("huoli jianbian").
+ *
+ * Visual language: pure white/black scaffold (system-following dual theme),
+ * violet gradient accent limited to three focal points (status chip while
+ * recording, newest card border, FAB), 12dp card rhythm, tonal elevation.
+ * All colors/typography/shapes come from MaterialTheme tokens - no hardcoded hex.
+ * All interactions preserved verbatim: long-press delete dialog, mic FAB pulse
+ * (audioLevel * 0.3), finish button, status bar.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,18 +93,11 @@ fun MainScreen(
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            "课堂翻译",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        Text(
-                            "语音识别 + 大模型翻译",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    Text(
+                        "课堂翻译",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
                 },
                 actions = {
                     if (state.entries.isNotEmpty()) {
@@ -115,7 +118,7 @@ fun MainScreen(
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
                 ),
             )
@@ -138,11 +141,15 @@ fun MainScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(vertical = 12.dp),
                     ) {
-                        items(state.entries, key = { it.id }) { entry ->
-                            TranslationCard(entry, onDelete = { viewModel.deleteEntry(entry.id) })
+                        itemsIndexed(state.entries, key = { _, entry -> entry.id }) { index, entry ->
+                            TranslationCard(
+                                entry = entry,
+                                isLatest = index == state.entries.lastIndex,
+                                onDelete = { viewModel.deleteEntry(entry.id) },
+                            )
                         }
                     }
                 }
@@ -173,6 +180,17 @@ fun MainScreen(
                     delay(5000)
                     viewModel.dismissError()
                 }
+            }
+
+            if (state.entries.isNotEmpty()) {
+                Text(
+                    "已翻译 ${state.entries.size} 段",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(bottom = 4.dp),
+                )
             }
 
             Row(
@@ -208,20 +226,33 @@ fun MainScreen(
     }
 }
 
+/** Status chip: violet gradient while recording, tonal pill otherwise. */
 @Composable
 private fun StatusBar(state: TranslatorUiState) {
+    val cs = MaterialTheme.colorScheme
+    val chipShape = MaterialTheme.shapes.small
+    val gradient = Brush.linearGradient(listOf(cs.primary, cs.tertiary))
+    val chipModifier = if (state.isRecording) {
+        Modifier.background(gradient, chipShape)
+    } else {
+        Modifier.background(cs.secondaryContainer, chipShape)
+    }
+    val chipContent = if (state.isRecording) cs.onPrimary else cs.onSecondaryContainer
+    val chipSub = if (state.isRecording) cs.onPrimary.copy(alpha = 0.8f) else cs.onSecondaryContainer.copy(alpha = 0.8f)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = chipModifier.padding(horizontal = 12.dp, vertical = 6.dp),
+        ) {
             val dotColor by animateColorAsState(
-                if (state.isRecording) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant,
+                if (state.isRecording) chipContent else cs.primary,
                 label = "dot",
             )
             Box(
@@ -234,7 +265,7 @@ private fun StatusBar(state: TranslatorUiState) {
             Text(
                 state.status,
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = chipContent,
             )
         }
 
@@ -243,7 +274,7 @@ private fun StatusBar(state: TranslatorUiState) {
                 Text(
                     "${state.entries.size} 段",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = chipSub,
                 )
                 Spacer(Modifier.width(12.dp))
             }
@@ -258,7 +289,7 @@ private fun StatusBar(state: TranslatorUiState) {
             Text(
                 "$asrName + ${state.settings.translateModel}",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = cs.onSurfaceVariant,
             )
         }
     }
@@ -271,10 +302,20 @@ private fun EmptyState() {
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "\uD83C\uDF99",
-                style = MaterialTheme.typography.displayMedium,
-            )
+            Box(
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = "开始录音",
+                    modifier = Modifier.size(44.dp),
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            }
             Spacer(Modifier.height(16.dp))
             Text(
                 "点击麦克风开始",
@@ -291,10 +332,19 @@ private fun EmptyState() {
     }
 }
 
+/**
+ * Transcript card. Newest entry carries the 1.5dp violet gradient border +
+ * primary tint (B-direction focal point); older cards stay quiet.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TranslationCard(entry: TranslationEntry, onDelete: () -> Unit = {}) {
+private fun TranslationCard(
+    entry: TranslationEntry,
+    isLatest: Boolean = false,
+    onDelete: () -> Unit = {},
+) {
     var showDeleteDialog by remember { mutableStateOf(false) }
+    val cs = MaterialTheme.colorScheme
 
     if (showDeleteDialog) {
         AlertDialog(
@@ -314,6 +364,19 @@ private fun TranslationCard(entry: TranslationEntry, onDelete: () -> Unit = {}) 
         )
     }
 
+    val gradientBorder = Brush.linearGradient(listOf(cs.primary, cs.tertiary))
+    val cardColors = if (isLatest) {
+        CardDefaults.cardColors(
+            containerColor = cs.primary.copy(alpha = 0.12f),
+            contentColor = cs.onSurface,
+        )
+    } else {
+        CardDefaults.cardColors(
+            containerColor = cs.surfaceContainer,
+            contentColor = cs.onSurface,
+        )
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -321,59 +384,69 @@ private fun TranslationCard(entry: TranslationEntry, onDelete: () -> Unit = {}) 
                 onClick = {},
                 onLongClick = { showDeleteDialog = true },
             ),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
+        colors = cardColors,
         shape = MaterialTheme.shapes.medium,
+        border = if (isLatest) {
+            BorderStroke(1.5.dp, gradientBorder)
+        } else {
+            BorderStroke(1.dp, cs.outlineVariant.copy(alpha = 0.35f))
+        },
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Text(
-                text = entry.english,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            // Timestamp rail: purple, small, top anchor
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    entry.timestamp,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                if (entry.isCorrected) {
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "已修正",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
+            }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
 
+            // Chinese translation = primary content layer (white, prominent)
             Text(
                 text = entry.chinese,
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+
+            Spacer(Modifier.height(4.dp))
+
+            // English original = secondary layer (grey, single line)
+            Text(
+                text = entry.english,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
 
             Spacer(Modifier.height(6.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        entry.timestamp,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (entry.isCorrected) {
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            "已修正",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.tertiary,
-                        )
-                    }
-                }
-                Text(
-                    "${entry.latencyMs}毫秒",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (entry.latencyMs < 3000) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.tertiary,
-                )
-            }
+            Text(
+                "${entry.latencyMs}毫秒",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (entry.latencyMs < 3000) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.tertiary,
+            )
         }
     }
 }
 
+/**
+ * 80dp asymmetric "leaf" FAB (B-direction focal point). Idle: violet
+ * primary->tertiary gradient; recording: solid error (kept behavior) with
+ * the audioLevel pulse animation preserved.
+ */
 @Composable
 private fun RecordButton(
     isRecording: Boolean,
@@ -382,30 +455,35 @@ private fun RecordButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val cs = MaterialTheme.colorScheme
     val animatedScale by animateFloatAsState(
         if (isRecording) 1f + audioLevel * 0.3f else 1f,
         label = "scale",
     )
-    val buttonColor by animateColorAsState(
-        if (isRecording) MaterialTheme.colorScheme.error
-        else MaterialTheme.colorScheme.primary,
-        label = "btnColor",
+    val fabShape = RoundedCornerShape(
+        topStart = 40.dp, topEnd = 18.dp,
+        bottomEnd = 40.dp, bottomStart = 18.dp,
     )
-
-    // Content color follows buttonColor: on-primary when idle, on-error when recording
-    val contentColor = if (isRecording) MaterialTheme.colorScheme.onError
-                       else MaterialTheme.colorScheme.onPrimary
+    val gradient = Brush.linearGradient(listOf(cs.primary, cs.tertiary))
+    val bgModifier = if (isRecording) {
+        Modifier.background(cs.error, fabShape)
+    } else {
+        Modifier.background(gradient, fabShape)
+    }
+    val contentColor = if (isRecording) cs.onError else cs.onPrimary
 
     FloatingActionButton(
         onClick = onClick,
-        modifier = modifier.size((64 * animatedScale).dp),
-        shape = CircleShape,
-        containerColor = buttonColor,
+        modifier = modifier
+            .size((64 * animatedScale).dp)
+            .then(bgModifier),
+        shape = fabShape,
+        containerColor = Color.Transparent,
         contentColor = contentColor,
     ) {
         if (isProcessing && !isRecording) {
             CircularProgressIndicator(
-                modifier = Modifier.size(28.dp),
+                modifier = Modifier.size(32.dp),
                 color = contentColor,
                 strokeWidth = 2.5.dp,
             )
@@ -413,7 +491,8 @@ private fun RecordButton(
             Icon(
                 imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
                 contentDescription = if (isRecording) "停止" else "开始",
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(28.dp),
+                tint = androidx.compose.ui.graphics.Color.White,
             )
         }
     }
