@@ -12,8 +12,8 @@ android {
         applicationId = "com.classroom.translator"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
 
         // Read MiniMax-M3 API key from local.properties (not committed)
         // gradleProperty 只读 Gradle 属性(不含 local.properties!) —— 之前编译进去的是 "null"
