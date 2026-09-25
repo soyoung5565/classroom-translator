@@ -10,6 +10,9 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -18,37 +21,72 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * Material 3 theme entry point.
+ * "B 方向 · 活力渐变" theme entry point — dual-theme final (2026-09-25).
  *
- * Design tokens follow the official M3 specification (m3.material.io) and the
- * Material 3 skill (hamen/material-3-skill). Three layers:
+ * Layer 1 — ColorScheme: hand-tuned from the design tokens in Color.kt
+ * (converted from the design source oklch values, verified against renders).
+ * Dynamic color stays OFF so the brand violet survives on every device.
  *
- *   1. Color scheme
- *      - Android 12+ (API 31+): dynamic color from system wallpaper (Material You)
- *      - Below API 31 or if dynamicColor=false: hand-tuned tonal palette
- *        derived from BrandSeed (4A6FE5 teaching-blue) via ColorScheme.fromSeed.
+ * Layer 2 — AppTokens (CompositionLocal): everything M3's ColorScheme cannot
+ * express — brand gradients, soft-gradient alpha pairs, hairlines and the
+ * oklab-mixed timestamp color. Screens read it via `AppTheme.tokens`.
  *
- *   2. Typography
- *      - Full M3 type scale (15 base + 15 emphasized styles). Uses the system
- *        default font family; per M3 spec Roboto/Roboto Flex IS the correct
- *        default on Android (frontend-design skill guidance to avoid Roboto
- *        does NOT apply when implementing MD3).
- *      - Numeric tokens (labelSmall for timestamps/latency) get FontFamily.Monospace.
- *
- *   3. Shape
- *      - 5 corner radii from the MD3 shape token scale:
- *        extraSmall=4dp (chips, snackbars), small=8dp (text fields, menus),
- *        medium=12dp (cards), large=16dp (FABs, drawer),
- *        extraLarge=28dp (dialogs, sheets).
- *
- * To disable dynamic color (e.g. for branding consistency), pass dynamicColor=false.
+ * Layer 3 — Typography / Shapes: the design's type scale equals the M3
+ * default scale (11/12/14/16/22/24), so we keep M3 defaults; labelSmall is
+ * non-monospace with tabular figures (design uses `font-feature-settings: tnum`).
  */
+data class AppTokens(
+    val gradA: Color,
+    val gradB: Color,
+    val gradSoftA: Color,
+    val gradSoftB: Color,
+    val hairline: Color,
+    val ts: Color,
+    val latestEnA: Color,
+    val glowTop: Color,
+    val glowBottom: Color,
+    val ambient: Boolean,
+)
+
+internal val LightAppTokens = AppTokens(
+    gradA = LightGradA,
+    gradB = LightGradB,
+    gradSoftA = LightGradA.copy(alpha = 0.10f),
+    gradSoftB = LightGradB.copy(alpha = 0.10f),
+    hairline = LightOnSurface.copy(alpha = 0.10f),
+    ts = LightTs,
+    latestEnA = Color(0xFF7731BD),
+    glowTop = Color.Transparent,
+    glowBottom = Color.Transparent,
+    ambient = false,
+)
+
+internal val DarkAppTokens = AppTokens(
+    gradA = DarkGradA,
+    gradB = DarkGradB,
+    gradSoftA = DarkGradA.copy(alpha = 0.22f),
+    gradSoftB = DarkGradB.copy(alpha = 0.22f),
+    hairline = Color.White.copy(alpha = 0.08f),
+    ts = DarkTs,
+    latestEnA = Color(0xFFC99BFB),
+    glowTop = DarkGradA.copy(alpha = 0.20f),
+    glowBottom = DarkGradB.copy(alpha = 0.12f),
+    ambient = true,
+)
+
+val LocalAppTokens = staticCompositionLocalOf { LightAppTokens }
+
+/** Convenience accessor: `AppTheme.tokens` inside composables. */
+object AppTheme {
+    val tokens: AppTokens
+        @Composable get() = LocalAppTokens.current
+}
+
 @Composable
 fun TranslatorTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // 2026-09-24 redesign: dynamicColor disabled to enforce BrandSeed violet across all Android versions.
-    // Material You would otherwise hijack the palette with the system wallpaper's tones, hiding the design
-    // intent (and making A/B comparisons vs old build impossible).
+    // Dynamic color intentionally disabled: Material You would otherwise
+    // hijack the design's violet palette with wallpaper tones.
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
@@ -126,45 +164,44 @@ fun TranslatorTheme(
         )
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = AppTypography,
-        shapes = AppShapes,
-        content = content,
-    )
+    CompositionLocalProvider(
+        LocalAppTokens provides (if (darkTheme) DarkAppTokens else LightAppTokens),
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = AppTypography,
+            shapes = AppShapes,
+            content = content,
+        )
+    }
 }
 
-// Full Material 3 type scale.
-// Sizes/weights/line-heights follow m3.material.io/typescale (Roboto Flex defaults).
+// Full Material 3 type scale. The design's own scale (11/12/14/16/22/24sp)
+// equals the M3 defaults, so values stay stock; labelSmall is Default font
+// with tabular figures (design timestamps use font-feature-settings: tnum).
 private val AppTypography = Typography(
-    // Display - hero text, large numbers
     displayLarge   = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,     fontSize = 57.sp, lineHeight = 64.sp, letterSpacing = (-0.25).sp),
     displayMedium  = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,     fontSize = 45.sp, lineHeight = 52.sp, letterSpacing = 0.sp),
     displaySmall   = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,     fontSize = 36.sp, lineHeight = 44.sp, letterSpacing = 0.sp),
 
-    // Headline - section headers
     headlineLarge  = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,     fontSize = 32.sp, lineHeight = 40.sp, letterSpacing = 0.sp),
     headlineMedium = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,     fontSize = 28.sp, lineHeight = 36.sp, letterSpacing = 0.sp),
     headlineSmall  = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,     fontSize = 24.sp, lineHeight = 32.sp, letterSpacing = 0.sp),
 
-    // Title - smaller headers, card titles
     titleLarge     = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.SemiBold,   fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = 0.sp),
     titleMedium    = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.SemiBold,   fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.15.sp),
     titleSmall     = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium,     fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.1.sp),
 
-    // Body - paragraph text, descriptions
-    bodyLarge      = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,     fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.5.sp),
+    bodyLarge      = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,     fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.25.sp),
     bodyMedium     = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,     fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.25.sp),
     bodySmall      = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,     fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.4.sp),
 
-    // Label - buttons, chips, captions, timestamps
     labelLarge     = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium,     fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.1.sp),
     labelMedium    = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium,     fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.5.sp),
-    // Timestamps, latency values, model names — monospace per Material 3 guidance for numeric/code-like data
-    labelSmall     = TextStyle(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Normal,   fontSize = 11.sp, lineHeight = 16.sp, letterSpacing = 0.5.sp),
+    labelSmall     = TextStyle(fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,     fontSize = 11.sp, lineHeight = 16.sp, letterSpacing = 0.5.sp, fontFeatureSettings = "tnum"),
 )
 
-// Material 3 shape token scale (5 corner-radius tiers + full pill).
+// Material 3 shape token scale (5 corner-radius tiers).
 private val AppShapes = Shapes(
     extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
     small      = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),

@@ -2,15 +2,21 @@ package com.classroom.translator.ui.screens
 
 import android.content.Context
 import android.content.Intent
-import androidx.compose.foundation.BorderStroke
+import android.media.MediaPlayer
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,64 +25,221 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.AudioFile
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.HistoryEdu
+import androidx.compose.material.icons.rounded.IosShare
+import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
-import android.media.MediaPlayer
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.classroom.translator.data.SessionManager
 import com.classroom.translator.data.TranslationSession
+import com.classroom.translator.ui.theme.AppTheme
+import com.classroom.translator.ui.theme.AppTokens
+import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
- * History (sessions list) screen + session detail screen.
- * 2026-09-25 B-direction redesign: pure white/black backgrounds, gradient
- * accents on primary actions, subject chip on session cards, dual-theme safe.
- * All colors / typography / shapes from MaterialTheme tokens.
- * Interactions preserved verbatim: SessionCard click -> detail, share/delete
- * buttons, whole-session entry, MediaPlayer play/pause/stop/seek, recording export.
+ * 历史记录页 + 会话详情页 —— 设计稿忠实重建
+ * （2026-09-25 双主题定稿，渲染基准 render-history / render-detail）。
+ *
+ * 结构（对照 screen-history.html / screen-detail.html，逻辑视口 393×852）：
+ *   appbar(compact 20px) + 搜索条(46dp 胶囊) + 分组标签/会话卡(44 图标+日期+时长+chips+chevron)
+ *   空状态：渐变圆角 orb + 文案 + 「开始第一课」
+ *   详情：返回+标题+分享/下载 → 播放条(播放/暂停/停止+进度) → 双语卡片流(ZH 徽标内联)
  */
-@OptIn(ExperimentalMaterial3Api::class)
+
+// ---------------------------------------------------------------------------
+// Design helpers（与 MainScreen 同款：135° 渐变 / 渐变填充 / 渐变描边环 / 环境光）
+// ---------------------------------------------------------------------------
+
+private fun brush135(colors: List<Color>, w: Float, h: Float): Brush {
+    val d = 0.70710678f
+    val len = abs(w * d) + abs(h * d)
+    val cx = w / 2f
+    val cy = h / 2f
+    return Brush.linearGradient(
+        colors = colors,
+        start = Offset(cx - d * len / 2f, cy - d * len / 2f),
+        end = Offset(cx + d * len / 2f, cy + d * len / 2f),
+    )
+}
+
+private fun Modifier.gradientFill(shape: Shape, colors: List<Color>): Modifier =
+    this.clip(shape).drawWithCache {
+        val brush = brush135(colors, size.width, size.height)
+        onDrawBehind { drawRect(brush) }
+    }
+
+private fun Modifier.gradientRing(shape: Shape, width: Dp, colors: List<Color>): Modifier =
+    this.drawWithContent {
+        drawContent()
+        val stroke = width.toPx()
+        val inner = Size(size.width - stroke, size.height - stroke)
+        if (inner.width > 0f && inner.height > 0f) {
+            val brush = brush135(colors, size.width, size.height)
+            val outline = shape.createOutline(inner, layoutDirection, this)
+            translate(stroke / 2f, stroke / 2f) {
+                val path = Path()
+                when (outline) {
+                    is Outline.Rounded -> path.addRoundRect(outline.roundRect)
+                    is Outline.Rectangle -> path.addRect(outline.rect)
+                    is Outline.Generic -> path.addPath(outline.path)
+                }
+                drawPath(path, brush = brush, style = Stroke(stroke))
+            }
+        }
+    }
+
+private fun Modifier.ambientGlow(tk: AppTokens): Modifier =
+    if (!tk.ambient) this else this.drawWithCache {
+        val w = size.width
+        val h = size.height
+        onDrawBehind {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(tk.glowTop, Color.Transparent),
+                    center = Offset(w * 0.85f, -0.05f * h),
+                    radius = w * 1.2f * 0.62f,
+                ),
+                radius = w * 1.2f * 0.62f,
+                center = Offset(w * 0.85f, -0.05f * h),
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(tk.glowBottom, Color.Transparent),
+                    center = Offset(-0.10f * w, 1.05f * h),
+                    radius = w * 1.1f * 0.60f,
+                ),
+                radius = w * 1.1f * 0.60f,
+                center = Offset(-0.10f * w, 1.05f * h),
+            )
+        }
+    }
+
+// ---------------------------------------------------------------------------
+// 日期 / 时长工具（真实会话数据）
+// ---------------------------------------------------------------------------
+
+private val DATE_FMT: SimpleDateFormat get() = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+private const val DEFAULT_SUBJECT = "英语课"
+
+/** "2026-09-25" -> "9月25日"（解析失败时原样返回） */
+private fun fmtMonthDay(date: String): String {
+    return try {
+        val p = date.split("-")
+        if (p.size >= 3) "${p[1].toInt()}月${p[2].toInt()}日" else date
+    } catch (e: Exception) { date }
+}
+
+/** "HH:mm(:ss)" -> 当天秒数 */
+private fun parseClockSec(t: String?): Int? {
+    if (t.isNullOrBlank()) return null
+    return try {
+        val p = t.split(":")
+        if (p.size >= 2) {
+            val h = p[0].trim().toInt(); val m = p[1].trim().toInt()
+            val s = if (p.size >= 3) p[2].trim().toInt() else 0
+            h * 3600 + m * 60 + s
+        } else null
+    } catch (e: Exception) { null }
+}
+
+/** 会话时长（秒）：优先首尾条目时间戳，退化为 start/end 时刻 */
+private fun sessionDurationSec(s: TranslationSession): Int? {
+    val ts = s.entries.mapNotNull { parseClockSec(it.timestamp) }
+    if (ts.size >= 2) {
+        val d = ts.last() - ts.first()
+        if (d > 0) return d
+    }
+    val a = parseClockSec(s.startTime); val b = parseClockSec(s.endTime)
+    if (a != null && b != null) {
+        var d = b - a
+        if (d < 0) d += 86400
+        if (d > 0) return d
+    }
+    return null
+}
+
+private fun fmtDur(totalSec: Int): String {
+    val h = totalSec / 3600
+    val m = (totalSec % 3600) / 60
+    val s = totalSec % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+}
+
+private fun todayStr(): String = DATE_FMT.format(Date())
+private fun weekAgoStr(): String {
+    val c = Calendar.getInstance(); c.add(Calendar.DAY_OF_YEAR, -6)
+    return DATE_FMT.format(c.time)
+}
+
+// ---------------------------------------------------------------------------
+// HistoryScreen —— 列表态 + 空状态
+// ---------------------------------------------------------------------------
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HistoryScreen(
     onNavigateToRecording: () -> Unit,
@@ -85,117 +248,184 @@ fun HistoryScreen(
     onNavigateToWholeSession: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val cs = MaterialTheme.colorScheme
+    val tk = AppTheme.tokens
     var sessions by remember { mutableStateOf<List<TranslationSession>>(emptyList()) }
     val sessionManager = remember { SessionManager(context) }
+    var query by remember { mutableStateOf("") }
+    var pendingDelete by remember { mutableStateOf<TranslationSession?>(null) }
+    val searchFocus = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
         sessions = sessionManager.loadSessions()
     }
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        "历史记录",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                },
-                actions = {
-                    TextButton(onClick = onNavigateToWholeSession) {
-                        Text(
-                            "整课转录",
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                    }
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = "设置",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                ),
-            )
-        },
-        floatingActionButton = {
-            // Gradient leaf FAB matching MainScreen idle state
-            val cs = MaterialTheme.colorScheme
-            val gradient = Brush.linearGradient(listOf(cs.primary, cs.tertiary))
-            val fabShape = androidx.compose.foundation.shape.RoundedCornerShape(
-                topStart = 28.dp, topEnd = 12.dp,
-                bottomEnd = 28.dp, bottomStart = 12.dp,
-            )
-            FloatingActionButton(
-                onClick = onNavigateToRecording,
-                modifier = Modifier.background(gradient, fabShape),
-                shape = fabShape,
-                containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                contentColor = cs.onPrimary,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Mic,
-                    contentDescription = "开始翻译",
-                    modifier = Modifier.size(28.dp),
+    val today = remember { todayStr() }
+    val weekAgo = remember { weekAgoStr() }
+    val filtered = remember(sessions, query) {
+        sessions.filter { s ->
+            query.isBlank() ||
+                fmtMonthDay(s.date).contains(query) ||
+                s.date.contains(query) ||
+                DEFAULT_SUBJECT.contains(query) ||
+                "已转写".contains(query)
+        }
+    }
+
+    Scaffold(containerColor = cs.surface) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            Box(Modifier.matchParentSize().ambientGlow(tk))
+
+            Column(Modifier.fillMaxSize()) {
+                HistoryAppBar(
+                    onSearch = { runCatching { searchFocus.requestFocus() } },
+                    onNavigateToWholeSession = onNavigateToWholeSession,
                 )
-            }
-        },
-        containerColor = MaterialTheme.colorScheme.background,
-    ) { padding ->
-        if (sessions.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(
-                        modifier = Modifier
-                            .size(96.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.secondaryContainer),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.History,
-                            contentDescription = "暂无记录",
-                            modifier = Modifier.size(44.dp),
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        "还没有翻译记录，点击下方按钮开始",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                SearchBarView(
+                    query = query,
+                    onQueryChange = { query = it },
+                    focusRequester = searchFocus,
+                )
+                if (sessions.isEmpty()) {
+                    EmptyHistory(onNavigateToRecording = onNavigateToRecording)
+                } else {
+                    HistoryList(
+                        sessions = filtered,
+                        today = today,
+                        weekAgo = weekAgo,
+                        onOpen = onNavigateToSession,
+                        onLongPress = { pendingDelete = it },
                     )
                 }
             }
-        } else {
-            LazyColumn(
+        }
+    }
+
+    pendingDelete?.let { target ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("删除这条会话记录？") },
+            text = {
+                Text("${fmtMonthDay(target.date)} · ${DEFAULT_SUBJECT} · ${target.entries.size} 句\n删除后无法恢复。")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    sessionManager.deleteSession(target.id)
+                    sessions = sessionManager.loadSessions()
+                    pendingDelete = null
+                }) { Text("删除", color = cs.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("取消") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun HistoryAppBar(
+    onSearch: () -> Unit,
+    onNavigateToWholeSession: () -> Unit,
+) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp)
+            .padding(start = 16.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "历史记录",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = cs.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onNavigateToWholeSession) {
+            Icon(
+                Icons.Rounded.AudioFile,
+                contentDescription = "整课转录",
+                tint = cs.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        IconButton(onClick = onSearch) {
+            Icon(
+                Icons.Rounded.Search,
+                contentDescription = "搜索",
+                tint = cs.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchBarView(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    focusRequester: FocusRequester,
+) {
+    val cs = MaterialTheme.colorScheme
+    val tk = AppTheme.tokens
+    val shape = RoundedCornerShape(50)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 12.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(46.dp)
+                .clip(shape)
+                .background(cs.surfaceContainerHigh)
+                .border(1.dp, tk.hairline, shape)
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Rounded.Search,
+                contentDescription = null,
+                tint = cs.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyMedium.copy(color = cs.onSurface),
+                cursorBrush = SolidColor(cs.primary),
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 12.dp),
-            ) {
-                items(sessions, key = { it.id }) { session ->
-                    SessionCard(
-                        session = session,
-                        onClick = { onNavigateToSession(session.id) },
-                        onDelete = {
-                            sessionManager.deleteSession(session.id)
-                            sessions = sessionManager.loadSessions()
-                        },
-                        onExport = { shareSessionDocx(context, sessionManager, session) },
+                    .weight(1f)
+                    .focusRequester(focusRequester),
+                decorationBox = { inner ->
+                    if (query.isEmpty()) {
+                        Text(
+                            "搜索科目或日期",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = cs.onSurfaceVariant,
+                        )
+                    }
+                    inner()
+                },
+            )
+            if (query.isNotEmpty()) {
+                IconButton(
+                    onClick = { onQueryChange("") },
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(
+                        Icons.Rounded.Close,
+                        contentDescription = "清除",
+                        tint = cs.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
                     )
                 }
             }
@@ -204,104 +434,231 @@ fun HistoryScreen(
 }
 
 @Composable
-private fun SessionCard(
-    session: TranslationSession,
-    onClick: () -> Unit,
-    onDelete: () -> Unit,
-    onExport: () -> Unit,
+private fun HistoryList(
+    sessions: List<TranslationSession>,
+    today: String,
+    weekAgo: String,
+    onOpen: (Long) -> Unit,
+    onLongPress: (TranslationSession) -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
-    Card(
+    val groups = remember(sessions, today, weekAgo) {
+        val g0 = sessions.filter { it.date == today }
+        val g1 = sessions.filter { it.date != today && it.date >= weekAgo }
+        val g2 = sessions.filter { it.date < weekAgo }
+        listOf("今天" to g0, "本周" to g1, "更早" to g2).filter { it.second.isNotEmpty() }
+    }
+    LazyColumn(
         modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = cs.surfaceContainer,
-            contentColor = cs.onSurface,
-        ),
-        shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(1.dp, cs.outlineVariant.copy(alpha = 0.35f)),
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(top = 2.dp, bottom = 16.dp),
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+        groups.forEach { (label, list) ->
+            item(key = "g-$label") {
                 Text(
-                    text = session.date,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = cs.onSurface,
-                )
-                // Subject chip (class tag)
-                Box(
-                    modifier = Modifier
-                        .background(cs.primary.copy(alpha = 0.14f), MaterialTheme.shapes.small)
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                ) {
-                    Text(
-                        "英语课",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = cs.primary,
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(6.dp))
-
-            Text(
-                text = "${session.startTime} - ${session.endTime} · ${session.entryCount} 段翻译",
-                style = MaterialTheme.typography.bodyMedium,
-                color = cs.onSurfaceVariant,
-            )
-
-            if (session.summary.isNotBlank()) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = session.summary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = cs.onSurfaceVariant.copy(alpha = 0.8f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                    label,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.1.sp,
+                    color = cs.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp, bottom = 0.dp, start = 2.dp, end = 2.dp),
                 )
             }
-
-            Spacer(Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(onClick = onExport) {
-                    Icon(
-                        Icons.Default.Share,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = cs.primary,
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text("分享", color = cs.primary)
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "删除",
-                        tint = cs.onSurfaceVariant,
-                    )
-                }
+            items(list, key = { it.id }) { s ->
+                HistoryCard(
+                    session = s,
+                    onClick = { onOpen(s.id) },
+                    onLongClick = { onLongPress(s) },
+                )
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun HistoryCard(
+    session: TranslationSession,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
+    val cs = MaterialTheme.colorScheme
+    val tk = AppTheme.tokens
+    val shape = RoundedCornerShape(12.dp)
+    val durSec = remember(session.id) { sessionDurationSec(session) }
+    val hsub = remember(durSec, session.entries.size) {
+        val n = "${session.entries.size} 句"
+        if (durSec != null) "${fmtDur(durSec)} · $n" else n
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(2.dp, shape)
+            .clip(shape)
+            .background(cs.surfaceContainerLow)
+            .border(1.dp, tk.hairline, shape)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .then(Modifier.gradientFill(RoundedCornerShape(12.dp), listOf(tk.gradSoftA, tk.gradSoftB)))
+                .border(1.dp, cs.primary.copy(alpha = 0.22f), RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Rounded.MenuBook,
+                contentDescription = null,
+                tint = cs.primary,
+                modifier = Modifier.size(21.dp),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${fmtMonthDay(session.date)} · $DEFAULT_SUBJECT",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = cs.onSurface,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    hsub,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 11.sp,
+                        color = cs.onSurfaceVariant,
+                        letterSpacing = 0.33.sp,
+                        fontFeatureSettings = "tnum",
+                    ),
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                SubjectChip(DEFAULT_SUBJECT, bg = cs.tertiaryContainer, fg = cs.onTertiaryContainer)
+                SubjectChip("已转写", bg = cs.primaryContainer, fg = cs.onPrimaryContainer)
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Icon(
+            Icons.Rounded.ChevronRight,
+            contentDescription = null,
+            tint = cs.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+@Composable
+private fun SubjectChip(label: String, bg: Color, fg: Color) {
+    Box(
+        modifier = Modifier
+            .height(22.dp)
+            .clip(RoundedCornerShape(50))
+            .background(bg),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.22.sp,
+            color = fg,
+            modifier = Modifier.padding(horizontal = 9.dp),
+        )
+    }
+}
+
+@Composable
+private fun EmptyHistory(onNavigateToRecording: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    val tk = AppTheme.tokens
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 40.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(92.dp)
+                    .gradientFill(RoundedCornerShape(32.dp), listOf(tk.gradSoftA, tk.gradSoftB))
+                    .border(1.dp, cs.primary.copy(alpha = 0.24f), RoundedCornerShape(32.dp))
+                    .gradientRing(RoundedCornerShape(32.dp), 1.5.dp, listOf(tk.gradA, tk.gradB)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.HistoryEdu,
+                    contentDescription = null,
+                    tint = cs.primary,
+                    modifier = Modifier.size(38.dp),
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "还没有会话记录",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = cs.onSurface,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "回到主界面开始第一次课堂翻译,\n结束后会自动归档到这里。",
+                fontSize = 14.sp,
+                lineHeight = 20.sp,
+                color = cs.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(14.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .height(44.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(cs.secondaryContainer)
+                    .border(1.dp, cs.primary.copy(alpha = 0.40f), RoundedCornerShape(50))
+                    .clickable(onClick = onNavigateToRecording)
+                    .padding(horizontal = 20.dp),
+            ) {
+                Icon(
+                    Icons.Rounded.Mic,
+                    contentDescription = null,
+                    tint = cs.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "开始第一课",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = cs.onSecondaryContainer,
+                )
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SessionDetailScreen —— 返回 + 标题 + 分享/下载 + 播放条 + 双语卡流
+// ---------------------------------------------------------------------------
+
 @Composable
 fun SessionDetailScreen(
     sessionId: Long,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val cs = MaterialTheme.colorScheme
+    val tk = AppTheme.tokens
     val sessionManager = remember { SessionManager(context) }
     var session by remember { mutableStateOf<TranslationSession?>(null) }
 
@@ -310,254 +667,386 @@ fun SessionDetailScreen(
     }
 
     val s = session
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            "会话详情",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                        if (s != null) {
-                            Text(
-                                s.date,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                actions = {
-                    if (s != null) {
-                        TextButton(onClick = { shareSessionDocx(context, sessionManager, s) }) {
-                            Text("导出", color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                ),
-            )
-        },
-        containerColor = MaterialTheme.colorScheme.background,
-    ) { padding ->
-        if (s != null) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .verticalScroll(rememberScrollState())
-                    .padding(16.dp),
-            ) {
-                if (s.audioPath.isNotBlank()) {
-                    val audioFile = java.io.File(s.audioPath)
-                    if (audioFile.exists()) {
-                        var isPlaying by remember { mutableStateOf(false) }
-                        var player by remember { mutableStateOf<MediaPlayer?>(null) }
-                        var currentPosition by remember { mutableStateOf(0) }
-                        var totalDuration by remember { mutableStateOf(0) }
-                        var isSeeking by remember { mutableStateOf(false) }
-                        val sizeKB = audioFile.length() / 1024
-                        LaunchedEffect(isPlaying) {
-                            while (isPlaying) {
-                                kotlinx.coroutines.delay(200)
-                                if (!isSeeking && player != null) {
-                                    try { currentPosition = player!!.currentPosition } catch (_: Exception) {}
-                                }
-                            }
-                        }
-                        val cs = MaterialTheme.colorScheme
-                        // Player card: gradient accent on icon, tonal surface
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = cs.surfaceContainer,
-                                contentColor = cs.onSurface,
-                            ),
-                            shape = MaterialTheme.shapes.medium,
-                            border = BorderStroke(1.dp, cs.outlineVariant.copy(alpha = 0.35f)),
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(CircleShape)
-                                            .background(
-                                                Brush.linearGradient(listOf(cs.primary, cs.tertiary))
-                                            ),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Icon(
-                                            Icons.Default.GraphicEq,
-                                            contentDescription = null,
-                                            tint = cs.onPrimary,
-                                            modifier = Modifier.size(22.dp),
-                                        )
-                                    }
-                                    Spacer(Modifier.width(10.dp))
-                                    Column {
-                                        Text(
-                                            "课堂录音",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = cs.onSurface,
-                                        )
-                                        Text(
-                                            "%d:%02d".format(totalDuration / 1000 / 60, totalDuration / 1000 % 60),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = cs.onSurfaceVariant,
-                                        )
-                                    }
-                                }
-                                Spacer(Modifier.height(8.dp))
-                                Slider(
-                                    value = currentPosition.toFloat(),
-                                    onValueChange = { isSeeking = true; currentPosition = it.toInt() },
-                                    onValueChangeFinished = { player?.seekTo(currentPosition); isSeeking = false },
-                                    valueRange = 0f..totalDuration.toFloat().coerceAtLeast(1f),
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = cs.primary,
-                                        activeTrackColor = cs.primary,
-                                    ),
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                ) {
-                                    Text(
-                                        "%d:%02d".format(currentPosition / 1000 / 60, currentPosition / 1000 % 60),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = cs.onSurfaceVariant,
-                                    )
-                                    Text(
-                                        "%d:%02d".format(totalDuration / 1000 / 60, totalDuration / 1000 % 60),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = cs.onSurfaceVariant,
-                                    )
-                                }
-                                Spacer(Modifier.height(4.dp))
-                                Row(
-                                    horizontalArrangement = Arrangement.Center,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    IconButton(onClick = {
-                                        if (isPlaying) { player?.pause(); isPlaying = false }
-                                        else {
-                                            if (player == null) {
-                                                try {
-                                                    player = MediaPlayer().apply {
-                                                        setDataSource(s.audioPath); prepare(); totalDuration = duration; start()
-                                                        setOnCompletionListener { isPlaying = false; currentPosition = 0 }
-                                                    }; isPlaying = true
-                                                } catch (e: Exception) { android.util.Log.e("History", "Play failed", e) }
-                                            } else { player?.start(); isPlaying = true }
-                                        }
-                                    }) {
-                                        Icon(
-                                            if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                            contentDescription = if (isPlaying) "暂停" else "播放",
-                                            tint = cs.primary,
-                                        )
-                                    }
-                                    Spacer(Modifier.width(12.dp))
-                                    IconButton(onClick = {
-                                        player?.stop(); player?.release(); player = null; isPlaying = false; currentPosition = 0
-                                    }) {
-                                        Icon(
-                                            Icons.Default.Stop,
-                                            contentDescription = "停止",
-                                            tint = cs.onSurfaceVariant,
-                                        )
-                                    }
-                                    Spacer(Modifier.width(12.dp))
-                                    TextButton(onClick = {
-                                        try {
-                                            val exportDir = java.io.File(context.getExternalFilesDir(null), "exports"); exportDir.mkdirs()
-                                            val exportFile = java.io.File(exportDir, "recording_${s.date}.wav")
-                                            audioFile.copyTo(exportFile, overwrite = true)
-                                            val uri = androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".fileprovider", exportFile)
-                                            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                                type = "audio/wav"; putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                            }
-                                            context.startActivity(android.content.Intent.createChooser(intent, "Export Recording"))
-                                        } catch (e: Exception) { android.util.Log.e("History", "Export failed", e) }
-                                    }) { Text("导出录音", color = cs.onSurfaceVariant) }
-                                }
-                            }
-                        }
-                    } else {
-                        Text(
-                            "录音文件不存在",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                    Spacer(Modifier.height(12.dp))
-                }
+    Scaffold(containerColor = cs.surface) { padding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            Box(Modifier.matchParentSize().ambientGlow(tk))
+            if (s == null) {
                 Text(
-                    "${s.date} · ${s.startTime} - ${s.endTime} · ${s.entries.size} 段",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    "会话不存在",
+                    color = cs.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.Center),
                 )
-                Spacer(Modifier.height(12.dp))
-                for (entry in s.entries) {
-                    val cs = MaterialTheme.colorScheme
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = cs.surfaceContainer,
-                            contentColor = cs.onSurface,
-                        ),
-                        shape = MaterialTheme.shapes.small,
-                        border = BorderStroke(1.dp, cs.outlineVariant.copy(alpha = 0.3f)),
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                entry.timestamp,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = cs.primary,
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                entry.english,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = cs.onSurface,
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                entry.chinese,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = cs.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-
-
+                return@Box
             }
-        } else {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("加载中...", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.fillMaxSize()) {
+                DetailAppBar(
+                    title = "${fmtMonthDay(s.date)} $DEFAULT_SUBJECT",
+                    onBack = onBack,
+                    onShare = { shareSessionDocx(context, sessionManager, s) },
+                    onDownload = if (s.audioPath.isNotBlank()) {
+                        { exportRecording(context, s) }
+                    } else null,
+                )
+                if (s.audioPath.isNotBlank()) {
+                    PlayerRow(audioPath = s.audioPath)
+                }
+                PairList(session = s)
             }
         }
     }
 }
+
+@Composable
+private fun DetailAppBar(
+    title: String,
+    onBack: () -> Unit,
+    onShare: () -> Unit,
+    onDownload: (() -> Unit)?,
+) {
+    val cs = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp)
+            .padding(start = 8.dp, end = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(
+                Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = "返回",
+                tint = cs.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        Text(
+            title,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = cs.onSurface,
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 8.dp),
+        )
+        IconButton(onClick = onShare) {
+            Icon(
+                Icons.Rounded.IosShare,
+                contentDescription = "分享",
+                tint = cs.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        if (onDownload != null) {
+            IconButton(onClick = onDownload) {
+                Icon(
+                    Icons.Rounded.Download,
+                    contentDescription = "下载",
+                    tint = cs.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayerRow(audioPath: String) {
+    val cs = MaterialTheme.colorScheme
+    val tk = AppTheme.tokens
+    var player by remember { mutableStateOf<MediaPlayer?>(null) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var positionMs by remember { mutableLongStateOf(0L) }
+    var durationMs by remember { mutableLongStateOf(0L) }
+
+    LaunchedEffect(isPlaying) {
+        while (isPlaying) {
+            positionMs = player?.currentPosition?.toLong() ?: 0L
+            durationMs = (player?.duration ?: 0).toLong()
+            delay(500L)
+        }
+    }
+    // 预加载时长：未播放时播放条也显示总时长（与设计稿静态态一致）
+    LaunchedEffect(Unit) {
+        try {
+            val mp = MediaPlayer().apply {
+                setDataSource(audioPath)
+                prepare()
+                seekTo(0)
+            }
+            mp.setOnCompletionListener {
+                isPlaying = false
+                positionMs = 0L
+                mp.seekTo(0)
+            }
+            player = mp
+            durationMs = mp.duration.toLong()
+        } catch (e: Exception) {
+            android.util.Log.e("Detail", "prepare failed", e)
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            player?.release()
+            player = null
+        }
+    }
+
+    fun start() {
+        val p = player ?: return
+        try {
+            if (p.currentPosition >= p.duration - 50) p.seekTo(0)
+            p.start()
+            isPlaying = true
+        } catch (e: Exception) {
+            android.util.Log.e("Detail", "start failed", e)
+        }
+    }
+
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 10.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(2.dp, RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .background(cs.surfaceContainerLow)
+                .border(1.dp, tk.hairline, RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            // 播放（渐变主按钮）
+            val playShape = CircleShape
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .shadow(4.dp, playShape, ambientColor = tk.gradA.copy(alpha = 0.30f), spotColor = tk.gradA.copy(alpha = 0.30f))
+                    .gradientFill(playShape, listOf(tk.gradA, tk.gradB))
+                    .clickable { start() },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.PlayArrow,
+                    contentDescription = "播放",
+                    tint = cs.onPrimary,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Spacer(Modifier.width(4.dp))
+            IconButton(onClick = { player?.pause(); isPlaying = false }) {
+                Icon(
+                    Icons.Rounded.Pause,
+                    contentDescription = "暂停",
+                    tint = cs.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            IconButton(onClick = {
+                player?.stop(); player?.release(); player = null
+                isPlaying = false; positionMs = 0L
+            }) {
+                Icon(
+                    Icons.Rounded.Stop,
+                    contentDescription = "停止",
+                    tint = cs.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Spacer(Modifier.width(6.dp))
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                val fraction = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(14.dp)
+                        .pointerInput(Unit) {
+                            detectTapGestures { o ->
+                                val f = (o.x / size.width).coerceIn(0f, 1f)
+                                val d = player?.duration ?: 0
+                                if (d > 0) { player?.seekTo((f * d).roundToInt()); positionMs = (f * d).toLong() }
+                            }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(cs.primary.copy(alpha = 0.18f))
+                            .drawWithContent {
+                                drawContent()
+                                val cx = size.width * fraction
+                                val cy = size.height / 2f
+                                drawCircle(cs.primary.copy(alpha = 0.22f), radius = 7.5f.dp.toPx(), center = Offset(cx, cy), style = Stroke(3.dp.toPx()))
+                                drawCircle(cs.primary, radius = 6.dp.toPx(), center = Offset(cx, cy))
+                            },
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(fraction)
+                                .gradientFill(RoundedCornerShape(2.dp), listOf(tk.gradA, tk.gradB)),
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        fmtMs(positionMs),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = cs.onSurface,
+                            fontFeatureSettings = "tnum",
+                        ),
+                    )
+                    Text(
+                        fmtMs(durationMs),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 11.sp,
+                            color = cs.onSurfaceVariant,
+                            fontFeatureSettings = "tnum",
+                        ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun fmtMs(ms: Long): String {
+    val total = (ms / 1000).toInt()
+    return fmtDur(total)
+}
+
+@Composable
+private fun PairList(session: TranslationSession) {
+    val cs = MaterialTheme.colorScheme
+    val tk = AppTheme.tokens
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(top = 4.dp, bottom = 16.dp),
+    ) {
+        items(session.entries, key = { it.timestamp + it.chinese.hashCode() }) { e ->
+            PairCard(
+                ts = e.timestamp.take(5),
+                zh = e.chinese,
+                en = e.english,
+                modifier = Modifier,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PairCard(
+    ts: String,
+    zh: String,
+    en: String,
+    modifier: Modifier = Modifier,
+) {
+    val cs = MaterialTheme.colorScheme
+    val tk = AppTheme.tokens
+    val shape = RoundedCornerShape(12.dp)
+
+    val tagContent = InlineTextContent(
+        Placeholder(
+            width = 31.sp,
+            height = 18.sp,
+            placeholderVerticalAlign = PlaceholderVerticalAlign.Center,
+        ),
+    ) {
+        Box(
+            modifier = Modifier
+                .height(18.dp)
+                .clip(RoundedCornerShape(50))
+                .gradientFill(RoundedCornerShape(50), listOf(tk.gradSoftA, tk.gradSoftB))
+                .border(1.dp, cs.primary.copy(alpha = 0.25f), RoundedCornerShape(50))
+                .padding(horizontal = 7.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "ZH",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 0.8.sp,
+                color = cs.primary,
+            )
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .shadow(2.dp, shape)
+            .clip(shape)
+            .background(cs.surfaceContainerLow)
+            .border(1.dp, tk.hairline, shape)
+            .padding(horizontal = 13.dp, vertical = 11.dp),
+    ) {
+        Column {
+            Text(
+                ts,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.55.sp,
+                    color = tk.ts,
+                    fontFeatureSettings = "tnum",
+                ),
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = buildAnnotatedString {
+                    append(zh)
+                    append("  ")
+                    appendInlineContent("zh-tag", "ZH")
+                },
+                inlineContent = mapOf("zh-tag" to tagContent),
+                fontSize = 16.sp,
+                lineHeight = 23.sp,
+                fontWeight = FontWeight.Medium,
+                color = cs.onSurface,
+            )
+            Spacer(Modifier.height(3.dp))
+            Row(Modifier.height(IntrinsicSize.Min)) {
+                Box(
+                    Modifier
+                        .width(2.dp)
+                        .fillMaxHeight()
+                        .background(cs.primary.copy(alpha = 0.38f)),
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    en,
+                    fontSize = 14.sp,
+                    lineHeight = 19.sp,
+                    color = cs.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 分享 / 导出（沿用既有实现）
+// ---------------------------------------------------------------------------
 
 private fun shareSessionDocx(
     context: Context,
@@ -580,4 +1069,20 @@ private fun shareSessionDocx(
     } catch (e: Exception) {
         android.util.Log.e("History", "Export failed", e)
     }
+}
+
+private fun exportRecording(context: Context, session: TranslationSession) {
+    try {
+        val audioFile = java.io.File(session.audioPath)
+        if (!audioFile.exists()) return
+        val exportDir = java.io.File(context.getExternalFilesDir(null), "exports"); exportDir.mkdirs()
+        val exportFile = java.io.File(exportDir, "recording_${session.date}.wav")
+        audioFile.copyTo(exportFile, overwrite = true)
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".fileprovider", exportFile)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "audio/wav"; putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "导出录音"))
+    } catch (e: Exception) { android.util.Log.e("History", "Export recording failed", e) }
 }

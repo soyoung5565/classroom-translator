@@ -678,7 +678,15 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
      * - 上一条是新条前缀（同句续写）→ 原地升级，避免重复条目
      * 2026-09-23: 24.8min 实测出现 5 条重复条目（模型整段重发导致）。
      */
-    private fun addOrMergeEntry(text: String, chinese: String) {
+    // [debug-only] UI 验证用：伪装"录音中"展示态（不启动真实录音）
+    internal fun seedRecordingUi() {
+        _state.value = _state.value.copy(
+            isRecording = true,
+            status = "录音中 · 已连接服务器",
+        )
+    }
+
+    internal fun addOrMergeEntry(text: String, chinese: String, timestamp: String? = null) {
         val entries = _state.value.entries
         val last = entries.lastOrNull()
         val t = text.trim()
@@ -693,7 +701,8 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 Log.i(TAG, "merge continuation: ${t.take(40)}")
             }
             else -> {
-                val entry = TranslationEntry(english = text, chinese = chinese)
+                val entry = if (timestamp != null) TranslationEntry(english = text, chinese = chinese, timestamp = timestamp)
+                else TranslationEntry(english = text, chinese = chinese)
                 _state.value = _state.value.copy(entries = entries + entry)
                 autoSave(entry)
             }
