@@ -452,7 +452,7 @@ private fun HistoryList(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(top = 2.dp, bottom = 16.dp),
     ) {
         groups.forEach { (label, list) ->
@@ -463,7 +463,7 @@ private fun HistoryList(
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.1.sp,
                     color = cs.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 6.dp, bottom = 0.dp, start = 2.dp, end = 2.dp),
+                    modifier = Modifier.padding(top = 4.dp, bottom = 0.dp, start = 2.dp, end = 2.dp),
                 )
             }
             items(list, key = { it.id }) { s ->
