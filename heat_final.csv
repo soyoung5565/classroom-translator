@@ -1,147 +1,0 @@
-time,battery_temp_C,battery_level_pct,gpu_busy_pct,top_proc
-00:00:23,386,70
-level:,, 0.0 wificond%
-00:00:29,386,70
-level:,, 0.0 wificond%
-00:00:34,386,70
-level:,21, 0.0 wificond%
-00:00:40,386,70
-level:,, 0.0 wificond%
-00:00:45,391,70
-level:,, 0.0 wificond%
-00:00:51,391,70
-level:,, 0.0 wificond%
-00:00:56,391,70
-level:,, 0.0 wificond%
-00:01:02,391,70
-level:,, 0.0 wificond%
-00:01:08,391,70
-level:,, 0.0 wificond%
-00:01:13,391,70
-level:,, 0.0 wificond%
-00:01:19,397,70
-level:,, 0.0 wificond%
-00:01:25,397,70
-level:,, 0.0 wificond%
-00:01:30,397,70
-level:,5, 0.0 wificond%
-00:01:36,397,70
-level:,10, 0.0 wificond%
-00:01:41,397,70
-level:,, 0.0 wificond%
-00:01:47,397,70
-level:,, 0.0 wificond%
-00:01:52,397,70
-level:,15, 0.0 wificond%
-00:01:58,397,70
-level:,, 0.0 wificond%
-00:02:04,397,70
-level:,, 0.0 wificond%
-00:02:10,401,69
-level:,, 0.0 wificond%
-00:02:16,404,69
-level:,, 0.0 wificond%
-00:02:21,404,69
-level:,, 0.0 wificond%
-00:02:27,411,69
-level:,, 0.0 wificond%
-00:02:33,411,69
-level:,, 0.0 xtra-daemon%
-00:02:39,420,69
-level:,4, 0.0 wificond%
-00:02:45,420,69
-level:,, 0.0 wificond%
-00:02:51,420,69
-level:,, 0.0 wificond%
-00:02:57,420,69
-level:,, 0.0 wificond%
-00:03:02,420,69
-level:,4, 0.0 wificond%
-00:03:09,432,69
-level:,, 0.0 wificond%
-00:03:15,432,69
-level:,, 0.0 wificond%
-00:03:21,438,69
-level:,, 0.0 wificond%
-00:03:27,441,69
-level:,, 0.0 xtra-daemon%
-00:03:33,441,69
-level:,, 0.0 wificond%
-00:03:38,441,69
-level:,, 0.0 wificond%
-00:03:44,441,69
-level:,, 0.0 wificond%
-00:03:49,441,69
-level:,, 0.0 wificond%
-00:03:55,441,69
-level:,, 0.0 wificond%
-00:04:01,441,69
-level:,, 0.0 wificond%
-00:04:06,441,69
-level:,, 0.0 wificond%
-00:04:12,441,69
-level:,, 0.0 wificond%
-00:04:18,441,69
-level:,4, 0.0 wificond%
-00:04:23,441,69
-level:,, 0.0 wificond%
-00:04:29,438,69
-level:,, 0.0 wificond%
-00:04:35,438,69
-level:,, 0.0 wificond%
-00:04:40,438,69
-level:,, 0.0 wificond%
-00:04:46,438,69
-level:,, 0.0 wificond%
-00:04:51,438,69
-level:,, 0.0 wificond%
-00:04:57,438,69
-level:,, 0.0 wificond%
-00:05:03,438,69
-level:,, 0.0 wificond%
-00:05:08,429,69
-level:,, 0.0 wificond%
-00:05:14,429,69
-level:,, 0.0 wificond%
-00:05:20,429,69
-level:,, 0.0 wificond%
-00:05:25,429,69
-level:,, 0.0 wificond%
-00:05:31,429,69
-level:,, 0.0 wificond%
-00:05:36,429,69
-level:,, 0.0 wificond%
-00:05:42,429,69
-level:,, 0.0 wificond%
-00:05:48,429,69
-level:,, 0.0 wificond%
-00:05:53,429,69
-level:,, 0.0 wificond%
-00:05:59,429,69
-level:,, 0.0 wificond%
-00:06:05,429,69
-level:,, 0.0 wificond%
-00:06:10,429,69
-level:,, 0.0 wificond%
-00:06:16,422,69
-level:,, 0.0 wificond%
-00:06:22,422,69
-level:,, 0.0 wificond%
-00:06:27,422,69
-level:,, 0.0 wificond%
-00:06:33,422,69
-level:,, 0.0 wificond%
-00:06:38,422,69
-level:,, 0.0 wificond%
-00:06:44,419,69
-level:,, 0.0 wificond%
-00:06:50,419,69
-level:,, 0.0 wificond%
-00:06:55,419,69
-level:,, 0.0 wificond%
-00:07:01,419,69
-level:,, 0.0 wificond%
-00:07:07,419,69
-level:,, 0.0 wificond%
-00:07:12,419,69
-level:,, 0.0 wificond%
