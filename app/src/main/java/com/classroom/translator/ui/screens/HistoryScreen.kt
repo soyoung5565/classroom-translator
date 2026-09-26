@@ -40,6 +40,8 @@ import androidx.compose.material.icons.outlined.HistoryEdu
 import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
@@ -284,6 +286,7 @@ fun HistoryScreen(
                 HistoryAppBar(
                     onSearch = { runCatching { searchFocus.requestFocus() } },
                     onNavigateToWholeSession = onNavigateToWholeSession,
+                    onSettings = onNavigateToSettings,
                 )
                 SearchBarView(
                     query = query,
@@ -301,6 +304,33 @@ fun HistoryScreen(
                         onLongPress = { pendingDelete = it },
                     )
                 }
+            }
+
+            // 录音 FAB（记录入口；设计稿未画，为保持旧版功能入口与可达性保留）
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 16.dp)
+                    .size(64.dp)
+                    .shadow(
+                        8.dp,
+                        RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp, bottomEnd = 32.dp, bottomStart = 14.dp),
+                        ambientColor = tk.gradA.copy(alpha = 0.42f),
+                        spotColor = tk.gradA.copy(alpha = 0.42f),
+                    )
+                    .gradientFill(
+                        RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp, bottomEnd = 32.dp, bottomStart = 14.dp),
+                        listOf(tk.gradA, tk.gradB),
+                    )
+                    .clickable(onClick = onNavigateToRecording),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Rounded.Mic,
+                    contentDescription = "开始录音",
+                    tint = cs.onPrimary,
+                    modifier = Modifier.size(28.dp),
+                )
             }
         }
     }
@@ -330,6 +360,7 @@ fun HistoryScreen(
 private fun HistoryAppBar(
     onSearch: () -> Unit,
     onNavigateToWholeSession: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
     Row(
@@ -358,6 +389,14 @@ private fun HistoryAppBar(
             Icon(
                 Icons.Rounded.Search,
                 contentDescription = "搜索",
+                tint = cs.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        IconButton(onClick = onSettings) {
+            Icon(
+                Icons.Outlined.Settings,
+                contentDescription = "设置",
                 tint = cs.onSurfaceVariant,
                 modifier = Modifier.size(22.dp),
             )
@@ -453,7 +492,7 @@ private fun HistoryList(
             .fillMaxSize()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(top = 2.dp, bottom = 16.dp),
+        contentPadding = PaddingValues(top = 2.dp, bottom = 96.dp),
     ) {
         groups.forEach { (label, list) ->
             item(key = "g-$label") {
