@@ -15,7 +15,11 @@ data class TranslationEntryData(
     val chinese: String = "",
     /** 录音内偏移秒数（-1 = 未知）；课堂总结的"录音时间区间"依赖它 */
     val startSec: Int = -1,
-    val endSec: Int = -1
+    val endSec: Int = -1,
+    /** 润色前英文原文（首次润色变动的条目才留档；详情页"（原：…）"对比用，空 = 无对比） */
+    val origEnglish: String = "",
+    /** 润色前中文原文（同上） */
+    val origChinese: String = ""
 )
 
 data class TranslationSession(
@@ -63,6 +67,8 @@ class SessionManager(private val context: Context) {
                             put("chinese", entry.chinese)
                             put("startSec", entry.startSec)
                             put("endSec", entry.endSec)
+                            put("origEnglish", entry.origEnglish)
+                            put("origChinese", entry.origChinese)
                         })
                     }
                 })
@@ -151,7 +157,9 @@ class SessionManager(private val context: Context) {
                 english = obj.optString("english", ""),
                 chinese = obj.optString("chinese", ""),
                 startSec = obj.optInt("startSec", -1),
-                endSec = obj.optInt("endSec", -1)
+                endSec = obj.optInt("endSec", -1),
+                origEnglish = obj.optString("origEnglish", ""),
+                origChinese = obj.optString("origChinese", "")
             )
         }
         return TranslationSession(

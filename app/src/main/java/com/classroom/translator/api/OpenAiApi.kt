@@ -193,6 +193,9 @@ class OpenAiApi {
         }
     }
 
+    /** 云端对话结果：文本 + finish_reason（length=被截断，诊断"非 JSON"输出用） */
+    data class CloudChatResult(val text: String, val finishReason: String, val rawLen: Int)
+
     /**
      * 云端单轮对话（协议自适应）—— 课堂总结生成用。
      * 默认云端 = 火山方舟 Agent Plan (OpenAI 兼容: POST {baseUrl}/chat/completions);
@@ -207,7 +210,23 @@ class OpenAiApi {
         maxTokens: Int = 3000,
         temperature: Double = 0.3,
         reasoningEffort: String? = null
-    ): String = withContext(Dispatchers.IO) {
+    ): String = cloudChatFull(baseUrl, apiKey, model, system, user, maxTokens, temperature, reasoningEffort).text
+
+    /**
+     * 同 cloudChat，但返回 finish_reason 等诊断信息。
+     * 2026-09-29 加固：① content 为空时回退 reasoning_content（有些网关把答案放进思考字段）；
+     * ② finish_reason 记入日志（"length" = max_tokens 截断，是"模型输出非 JSON"的高发原因）。
+     */
+    suspend fun cloudChatFull(
+        baseUrl: String,
+        apiKey: String,
+        model: String,
+        system: String,
+        user: String,
+        maxTokens: Int = 3000,
+        temperature: Double = 0.3,
+        reasoningEffort: String? = null
+    ): CloudChatResult = withContext(Dispatchers.IO) {
         val anthropic = isAnthropicProtocol(baseUrl)
         val url = if (anthropic) "$baseUrl/v1/messages" else "$baseUrl/chat/completions"
         val payload = if (anthropic) {
@@ -249,15 +268,41 @@ class OpenAiApi {
         val response = client.newCall(request).execute()
         val body = response.body?.string() ?: throw Exception("Empty cloud response")
         if (!response.isSuccessful) throw Exception("Cloud API error ${response.code}: ${body.take(300)}")
+        val json = JSONObject(body)
         // usage 记录（含 reasoning_tokens，验证思考深度是否生效；可在 logcat 查看）
         try {
-            val u = JSONObject(body).optJSONObject("usage")
+            val u = json.optJSONObject("usage")
             if (u != null) {
                 val rt = u.optJSONObject("completion_tokens_details")?.optInt("reasoning_tokens", -1) ?: -1
                 Log.i("OpenAiApi", "cloudChat[$model] prompt=${u.optInt("prompt_tokens", -1)} completion=${u.optInt("completion_tokens", -1)} reasoning_tokens=$rt")
             }
         } catch (_: Exception) {}
-        stripThinking(cloudTextFromResponse(body, anthropic))
+
+        val finish: String
+        val rawText: String
+        if (anthropic) {
+            finish = json.optString("stop_reason", "")
+            val contentArr = json.optJSONArray("content")
+            val sb = StringBuilder()
+            if (contentArr != null) {
+                for (i in 0 until contentArr.length()) {
+                    val c = contentArr.optJSONObject(i) ?: continue
+                    if (c.optString("type") == "text") sb.append(c.optString("text"))
+                }
+            }
+            rawText = sb.toString()
+        } else {
+            val ch = json.optJSONArray("choices")?.optJSONObject(0)
+                ?: throw Exception("Cloud API 无 choices: ${body.take(200)}")
+            finish = ch.optString("finish_reason", "")
+            val msg = ch.optJSONObject("message") ?: JSONObject()
+            val content = msg.optString("content", "")
+            // content 为空时回退 reasoning_content（有些网关/档位把答案写进思考字段）
+            rawText = if (content.isNotBlank()) content else msg.optString("reasoning_content", "")
+        }
+        val cleaned = stripThinking(rawText)
+        Log.i("OpenAiApi", "cloudChat[$model] finish=$finish textLen=${cleaned.length}")
+        CloudChatResult(cleaned, finish, cleaned.length)
     }
 
     /**

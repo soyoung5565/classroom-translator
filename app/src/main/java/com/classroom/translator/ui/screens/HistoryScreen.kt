@@ -59,6 +59,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -88,15 +89,19 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.classroom.translator.data.SessionManager
 import com.classroom.translator.data.ClassSummary
 import com.classroom.translator.data.TranslationSession
+import com.classroom.translator.ui.AiTaskKind
+import com.classroom.translator.ui.PolishDiff
 import com.classroom.translator.ui.TranslatorViewModel
 import com.classroom.translator.ui.theme.AppTheme
 import com.classroom.translator.ui.theme.AppTokens
@@ -709,16 +714,25 @@ fun SessionDetailScreen(
     val tk = AppTheme.tokens
     val sessionManager = remember { SessionManager(context) }
     var session by remember { mutableStateOf<TranslationSession?>(null) }
-    val scope = rememberCoroutineScope()
+    var pendingSeekSec by remember { mutableStateOf<Int?>(null) }
 
     // —— AI 课堂总结 / 云端润色 状态 ——
-    var generating by remember { mutableStateOf(false) }
-    var polishing by remember { mutableStateOf(false) }
-    var aiStatus by remember { mutableStateOf("") }
-    var pendingSeekSec by remember { mutableStateOf<Int?>(null) }
+    // 任务跑在 ViewModel（viewModelScope）：退出本页/切屏不中断；回来时按任务态继续显示进度或结果。
+    val aiTasks by viewModel.aiTasks.collectAsState()
+    val aiTask = aiTasks[sessionId]
+    val generating = aiTask?.kind == AiTaskKind.SUMMARY && aiTask.running
+    val polishing = aiTask?.kind == AiTaskKind.POLISH && aiTask.running
+    val aiStatus = aiTask?.status.orEmpty()
+    val aiError = aiTask?.error
 
     LaunchedEffect(sessionId) {
         session = sessionManager.loadSessions().find { it.id == sessionId }
+    }
+    // 后台任务完成（completedAt 变化）→ 从磁盘重载会话，立即显示总结 / 润色后译文+对比
+    LaunchedEffect(aiTask?.completedAt) {
+        if ((aiTask?.completedAt ?: 0L) > 0L) {
+            session = sessionManager.loadSessions().find { it.id == sessionId }
+        }
     }
 
     val s = session
@@ -741,29 +755,12 @@ fun SessionDetailScreen(
 
             val onGenerate: () -> Unit = {
                 if (!generating && !polishing) {
-                    scope.launch {
-                        generating = true
-                        aiStatus = ""
-                        val r = viewModel.generateSummary(s) { aiStatus = it }
-                        r.onSuccess { sum ->
-                            session = s.copy(classSummary = sum.toJson())
-                            aiStatus = ""
-                        }
-                        r.onFailure { e -> aiStatus = "失败：${e.message ?: "未知错误"}" }
-                        generating = false
-                    }
+                    viewModel.startSummaryTask(sessionId)
                 }
             }
             val onPolish: () -> Unit = {
                 if (!generating && !polishing) {
-                    scope.launch {
-                        polishing = true
-                        aiStatus = ""
-                        val r = viewModel.polishSessionCloud(s) { aiStatus = it }
-                        r.onSuccess { updated -> session = updated; aiStatus = "" }
-                        r.onFailure { e -> aiStatus = "失败：${e.message ?: "未知错误"}" }
-                        polishing = false
-                    }
+                    viewModel.startPolishTask(sessionId)
                 }
             }
 
@@ -793,6 +790,7 @@ fun SessionDetailScreen(
                             generating = generating,
                             polishing = polishing,
                             status = aiStatus,
+                            error = aiError,
                             onGenerate = onGenerate,
                             onPolish = onPolish,
                             onSeek = { sec -> pendingSeekSec = sec },
@@ -1091,6 +1089,7 @@ private fun SummaryBlock(
     generating: Boolean,
     polishing: Boolean,
     status: String,
+    error: String?,
     onGenerate: () -> Unit,
     onPolish: () -> Unit,
     onSeek: (Int) -> Unit,
@@ -1339,9 +1338,9 @@ private fun SummaryBlock(
             }
         }
 
-        if (!busy && status.isNotBlank()) {
+        if (!busy && !error.isNullOrBlank()) {
             Spacer(Modifier.height(8.dp))
-            Text(status, fontSize = 11.sp, color = cs.error, lineHeight = 16.sp)
+            Text("失败：$error", fontSize = 11.sp, color = cs.error, lineHeight = 16.sp)
         }
     }
 }
@@ -1450,6 +1449,8 @@ private fun PairList(
                 ts = e.timestamp.take(5),
                 zh = e.chinese,
                 en = e.english,
+                zhPrev = e.origChinese,
+                enPrev = e.origEnglish,
                 modifier = Modifier,
             )
         }
@@ -1461,11 +1462,21 @@ private fun PairCard(
     ts: String,
     zh: String,
     en: String,
+    zhPrev: String = "",
+    enPrev: String = "",
     modifier: Modifier = Modifier,
 ) {
     val cs = MaterialTheme.colorScheme
     val tk = AppTheme.tokens
     val shape = RoundedCornerShape(12.dp)
+
+    // 润色前后对比（2026-09-29）：仅对"润色确有变化"的条目计算/显示「（原：…）」+ 词级高亮
+    val zhDiff = remember(zh, zhPrev) {
+        if (zhPrev.isBlank() || zhPrev.trim() == zh.trim()) null else PolishDiff.diff(zh, zhPrev)
+    }
+    val enDiff = remember(en, enPrev) {
+        if (enPrev.isBlank() || enPrev.trim() == en.trim()) null else PolishDiff.diff(en, enPrev)
+    }
 
     val tagContent = InlineTextContent(
         Placeholder(
@@ -1516,7 +1527,16 @@ private fun PairCard(
             Spacer(Modifier.height(4.dp))
             Text(
                 text = buildAnnotatedString {
-                    append(zh)
+                    if (zhDiff != null) {
+                        append(
+                            PolishDiff.annotate(
+                                zh, zhDiff.newRanges,
+                                SpanStyle(color = cs.primary, fontWeight = FontWeight.SemiBold),
+                            )
+                        )
+                    } else {
+                        append(zh)
+                    }
                     append("  ")
                     appendInlineContent("zh-tag", "ZH")
                 },
@@ -1526,6 +1546,10 @@ private fun PairCard(
                 fontWeight = FontWeight.Medium,
                 color = cs.onSurface,
             )
+            if (zhDiff != null) {
+                Spacer(Modifier.height(2.dp))
+                PrevLine(text = zhPrev, diff = zhDiff, indent = 0.dp)
+            }
             Spacer(Modifier.height(3.dp))
             Row(Modifier.height(IntrinsicSize.Min)) {
                 Box(
@@ -1535,15 +1559,65 @@ private fun PairCard(
                         .background(cs.primary.copy(alpha = 0.38f)),
                 )
                 Spacer(Modifier.width(10.dp))
-                Text(
-                    en,
-                    fontSize = 14.sp,
-                    lineHeight = 19.sp,
-                    color = cs.onSurfaceVariant,
-                )
+                Column {
+                    Text(
+                        text = buildAnnotatedString {
+                            if (enDiff != null) {
+                                append(
+                                    PolishDiff.annotate(
+                                        en, enDiff.newRanges,
+                                        SpanStyle(color = cs.primary, fontWeight = FontWeight.Medium),
+                                    )
+                                )
+                            } else {
+                                append(en)
+                            }
+                        },
+                        fontSize = 14.sp,
+                        lineHeight = 19.sp,
+                        color = cs.onSurfaceVariant,
+                    )
+                    if (enDiff != null) {
+                        Spacer(Modifier.height(2.dp))
+                        PrevLine(text = enPrev, diff = enDiff, indent = 0.dp)
+                    }
+                }
             }
         }
     }
+}
+
+/**
+ * 「（原：…）」润色前对照行：小字展示润色前文本，被替换掉的词加删除线；
+ * 配合正文里的高亮（新增/改动过的词）即"润色前后差距"。
+ */
+@Composable
+private fun PrevLine(text: String, diff: PolishDiff.DiffResult, indent: Dp) {
+    val cs = MaterialTheme.colorScheme
+    val muted = cs.onSurfaceVariant.copy(alpha = 0.8f)
+    val strike = SpanStyle(
+        color = cs.onSurfaceVariant.copy(alpha = 0.5f),
+        textDecoration = TextDecoration.LineThrough,
+    )
+    Text(
+        text = buildAnnotatedString {
+            append("（原：")
+            val base = length
+            append(text)
+            if (diff.hasOld) {
+                diff.oldRanges.forEach { r ->
+                    if (r.first >= 0 && r.last < text.length) {
+                        addStyle(strike, base + r.first, base + r.last + 1)
+                    }
+                }
+            }
+            append("）")
+        },
+        fontSize = 12.sp,
+        lineHeight = 17.sp,
+        color = muted,
+        modifier = Modifier.padding(start = indent, top = 1.dp),
+    )
 }
 
 // ---------------------------------------------------------------------------

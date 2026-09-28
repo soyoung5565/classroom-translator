@@ -2,6 +2,7 @@ package com.classroom.translator.data
 
 import org.json.JSONArray
 import org.json.JSONObject
+import org.json.JSONTokener
 
 /** 课堂总结 · 重点条目（含录音时间区间，秒） */
 data class SummaryPoint(val title: String, val detail: String, val startSec: Int, val endSec: Int)
@@ -155,6 +156,12 @@ data class ClassSummary(
             "规则: 1) at 必须是给定条目编号; 2) 除 term 外全部中文; 3) 只输出 JSON,不要任何其他文字。"
         )
 
+        /** 解析失败重试时追加的系统约束（强化"只输出一个完整 JSON"）。 */
+        const val RETRY_SYSTEM_SUFFIX: String =
+            "注意：你上一次的输出不是有效 JSON（可能被截断或夹带了说明文字）。" +
+            "这次务必只输出一个完整、严格有效的 JSON 对象：不要 markdown 代码块、不要任何解释、" +
+            "不要在 JSON 前后写任何文字，并确保所有括号成对匹配、JSON 完整闭合。"
+
         fun buildUserPrompt(entries: List<TranslationEntryData>): String {
             val sb = StringBuilder("转写内容:\n")
             entries.forEachIndexed { i, e ->
@@ -206,13 +213,22 @@ data class ClassSummary(
             sessionStart: String,
             model: String
         ): ClassSummary? {
+            for (cand in jsonCandidates(raw)) {
+                val o = tryParseJsonObject(cand) ?: continue
+                if (KNOWN_KEYS.none { o.has(it) }) continue
+                return buildFrom(o, entries, sessionStart, model)
+            }
+            return null
+        }
+
+        /** 从已解析的 JSONObject 组装 ClassSummary（at 编号 → 秒区间映射） */
+        private fun buildFrom(
+            o: JSONObject,
+            entries: List<TranslationEntryData>,
+            sessionStart: String,
+            model: String
+        ): ClassSummary? {
             return try {
-                val text = raw.let {
-                    val s = it.indexOf('{')
-                    val e = it.lastIndexOf('}')
-                    if (s >= 0 && e > s) it.substring(s, e + 1) else it
-                }
-                val o = JSONObject(text)
                 val offs = entryOffsets(entries, sessionStart)
                 val lastEnd = offs.map { it.second }.lastOrNull { it >= 0 } ?: -1
 
@@ -295,6 +311,177 @@ data class ClassSummary(
             } catch (e: Exception) {
                 null
             }
+        }
+
+        // ---- 稳健提取（2026-09-29 加固：模型输出非 JSON / 被截断时的多层兜底）----
+
+        private val KNOWN_KEYS = listOf("overview", "points", "explainers", "questions", "keywords", "homework")
+
+        /** 收集 JSON 候选串（按可信度排序）：整体 → first{..last} → 平衡括号扫描 → 截断补全 → 格式修复变体。 */
+        private fun jsonCandidates(raw0: String): List<String> {
+            val out = LinkedHashSet<String>()
+            fun add(s: String?) {
+                val t = s?.trim().orEmpty()
+                if (t.length >= 2 && t.startsWith("{")) out.add(t)
+            }
+            // 剥 <think> 残块与 markdown 围栏（cloudChat 已剥一层，这里保底）
+            var base = raw0.replace("\uFEFF", "")
+            base = base.replace(Regex("(?s)<think>.*?</think>"), "")
+            base = base.replace(Regex("(?s)</think>"), "")
+            base = base.replace("```json", "").replace("```JSON", "").replace("```", "")
+            base = base.trim()
+
+            add(base)
+            run {
+                val s = base.indexOf('{')
+                val e = base.lastIndexOf('}')
+                if (s >= 0 && e > s) add(base.substring(s, e + 1))
+            }
+            // 平衡括号扫描：优先含已知字段名、体积大的对象
+            scanBalancedObjects(base)
+                .sortedWith(
+                    compareByDescending<String> { c -> KNOWN_KEYS.count { c.contains("\"$it\"") } }
+                        .thenByDescending { it.length }
+                )
+                .forEach { add(it) }
+            // 截断补全（finish_reason=length 时最常见的形态）
+            run {
+                val s = base.indexOf('{')
+                if (s >= 0) add(closeTruncated(base.substring(s)))
+            }
+            // 格式修复变体（尾逗号 / 智能引号 / 控制字符 / 单引号）
+            for (fixed in repairVariants(base)) {
+                add(fixed)
+                val s = fixed.indexOf('{')
+                val e = fixed.lastIndexOf('}')
+                if (s >= 0 && e > s) add(fixed.substring(s, e + 1))
+                add(closeTruncated(fixed.substring(minOf(s.coerceAtLeast(0), fixed.length))))
+            }
+            return out.toList().take(24)
+        }
+
+        /** 字符串感知地扫描所有平衡 { ... } 片段 */
+        private fun scanBalancedObjects(t: String): List<String> {
+            val res = ArrayList<String>()
+            var depth = 0
+            var start = -1
+            var inStr = false
+            var esc = false
+            for (i in t.indices) {
+                val c = t[i]
+                if (inStr) {
+                    when {
+                        esc -> esc = false
+                        c == '\\' -> esc = true
+                        c == '"' -> inStr = false
+                    }
+                    continue
+                }
+                when (c) {
+                    '"' -> inStr = true
+                    '{' -> {
+                        if (depth == 0) start = i
+                        depth++
+                    }
+                    '}' -> if (depth > 0) {
+                        depth--
+                        if (depth == 0 && start >= 0) {
+                            res.add(t.substring(start, i + 1))
+                            start = -1
+                        }
+                    }
+                }
+            }
+            return res.filter { it.length >= 12 }
+        }
+
+        /** 常见格式修复变体（保守 → 激进） */
+        private fun repairVariants(base: String): List<String> {
+            val noTrailingComma: (String) -> String = { s -> s.replace(Regex(",\\s*([}\\]])"), "$1") }
+            val smartQuotes: (String) -> String = { s -> s.replace(Regex("[\u201C\u201D]"), "\"") }
+            val ctrlChars: (String) -> String = { s ->
+                s.map { ch -> if (ch.code < 0x20 && ch != '\n' && ch != '\r' && ch != '\t') ' ' else ch }.joinToString("")
+            }
+            val singleQuotes: (String) -> String = { s ->
+                s.replace(Regex("([{,\\[])\\s*'([^'\\n]{1,80}?)'\\s*([:,\\]}])"), "$1\"$2\"$3")
+            }
+            val results = ArrayList<String>()
+            for (f in listOf(noTrailingComma, smartQuotes, ctrlChars, singleQuotes)) {
+                val r = f(base)
+                if (r != base) results.add(r)
+            }
+            for (combo in listOf(
+                noTrailingComma(smartQuotes(base)),
+                noTrailingComma(singleQuotes(base)),
+            )) {
+                if (combo != base && !results.contains(combo)) results.add(combo)
+            }
+            return results
+        }
+
+        /**
+         * 截断补全：对"从 { 开始但未闭合"的文本，在若干断点截断并补齐括号后尝试解析。
+         * （模型被 max_tokens 截断时，JSON 尾部缺失；尽量抢救出 overview/points 等已完整字段）
+         */
+        private fun closeTruncated(s: String?): String? {
+            if (s.isNullOrBlank() || !s.trimStart().startsWith("{")) return null
+            val text = s.trimStart()
+            val breaks = listOf(
+                text.length,
+                text.lastIndexOf(','),
+                text.lastIndexOf('"'),
+                text.lastIndexOf('}'),
+                text.lastIndexOf(']'),
+                text.lastIndexOf(':')
+            ).filter { it > 1 }.distinct().sortedDescending()
+            for (b in breaks) {
+                var prefix = text.substring(0, b).trimEnd()
+                while (prefix.endsWith(",")) prefix = prefix.dropLast(1).trimEnd()
+                val closers = closersFor(prefix) ?: continue
+                if (closers.isEmpty()) continue
+                val candidate = prefix + closers
+                if (tryParseJsonObject(candidate) != null) return candidate
+            }
+            return null
+        }
+
+        /** 计算补全所需闭合符（字符串感知）；文本停在未闭合字符串中时返回 null */
+        private fun closersFor(prefix: String): String? {
+            val stack = ArrayDeque<Char>()
+            var inStr = false
+            var esc = false
+            for (c in prefix) {
+                if (inStr) {
+                    when {
+                        esc -> esc = false
+                        c == '\\' -> esc = true
+                        c == '"' -> inStr = false
+                    }
+                    continue
+                }
+                when (c) {
+                    '"' -> inStr = true
+                    '{' -> stack.addLast('}')
+                    '[' -> stack.addLast(']')
+                    '}' -> if (stack.lastOrNull() == '}') stack.removeLast() else return null
+                    ']' -> if (stack.lastOrNull() == ']') stack.removeLast() else return null
+                }
+            }
+            if (inStr || esc) return null
+            return stack.reversed().joinToString("")
+        }
+
+        /**
+         * 严格解析：要求整段文本恰好是一个 JSON 对象（org.json 默认会忽略对象后的垃圾内容——
+         * 这曾导致"前缀示例对象"被误当结果。用 JSONTokener 手动检查是否消费完整串）。
+         */
+        private fun tryParseJsonObject(s: String): JSONObject? = try {
+            val tk = JSONTokener(s)
+            val v = tk.nextValue()
+            val rest = tk.nextClean()
+            if (v is JSONObject && rest.code == 0) v else null
+        } catch (e: Exception) {
+            null
         }
 
         private fun parseClockSec(t: String?): Int? {

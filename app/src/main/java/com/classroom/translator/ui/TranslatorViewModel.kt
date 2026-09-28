@@ -65,10 +65,31 @@ data class TranslatorUiState(
     val settings: AppSettings = AppSettings()
 )
 
+/** AI 后台任务类型（课堂总结 / 云端润色） */
+enum class AiTaskKind { SUMMARY, POLISH }
+
+/**
+ * AI 后台任务状态（按会话 id 跟踪）。任务跑在 viewModelScope，
+ * 退出详情页/切屏不会取消 —— 回到详情页时按此状态继续显示进度/结果。
+ */
+data class AiTaskState(
+    val kind: AiTaskKind,
+    val running: Boolean = true,
+    val status: String = "",
+    val error: String? = null,
+    val startedAt: Long = System.currentTimeMillis(),
+    /** 成功完成时间戳（>0 = 结果已写入会话文件；UI 据此重载会话显示结果） */
+    val completedAt: Long = 0L
+)
+
 class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         private const val TAG = "TranslatorVM"
+        /** 课堂总结总尝试次数（首次 + 重试） */
+        private const val MAX_SUMMARY_ATTEMPTS = 3
+        /** 课堂总结 max_tokens：8000（3500 时实测已用 3306，截断风险高） */
+        private const val SUMMARY_MAX_TOKENS = 8000
     }
 
     private val settingsRepo = SettingsRepository(app)
@@ -95,6 +116,68 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _state = MutableStateFlow(TranslatorUiState())
     val state: StateFlow<TranslatorUiState> = _state.asStateFlow()
+
+    // ===== AI 后台任务（课堂总结 / 云端润色）状态：按会话 id =====
+    // 关键修复（2026-09-29）：此前这两个任务在详情页的 rememberCoroutineScope 里 launch，
+    // 一退出详情页协程即被取消 → 生成中止、重新进入要重来。现改为统一在 viewModelScope 跑。
+    private val _aiTasks = MutableStateFlow<Map<Long, AiTaskState>>(emptyMap())
+    val aiTasks: StateFlow<Map<Long, AiTaskState>> = _aiTasks.asStateFlow()
+
+    private fun putAiTask(sessionId: Long, st: AiTaskState) {
+        _aiTasks.value = _aiTasks.value + (sessionId to st)
+    }
+
+    /**
+     * 启动「课堂总结」后台任务。退出详情页/切屏不会取消；
+     * 结果写回会话文件（classSummary），UI 通过 aiTasks + 会话重载显示。
+     */
+    fun startSummaryTask(sessionId: Long) {
+        if (_aiTasks.value[sessionId]?.running == true) return
+        putAiTask(sessionId, AiTaskState(kind = AiTaskKind.SUMMARY, status = "正在生成课堂总结…"))
+        viewModelScope.launch(Dispatchers.Default) {
+            val session = sessionManager.loadSessions().find { it.id == sessionId }
+            if (session == null) {
+                putAiTask(sessionId, AiTaskState(kind = AiTaskKind.SUMMARY, running = false, error = "会话不存在"))
+                return@launch
+            }
+            val r = generateSummary(session) { msg ->
+                putAiTask(sessionId, AiTaskState(kind = AiTaskKind.SUMMARY, status = msg))
+            }
+            r.onSuccess {
+                Log.i(TAG, "summary task done: session=$sessionId")
+                putAiTask(sessionId, AiTaskState(kind = AiTaskKind.SUMMARY, running = false, completedAt = System.currentTimeMillis()))
+            }.onFailure { e ->
+                Log.e(TAG, "summary task failed: session=$sessionId", e)
+                putAiTask(sessionId, AiTaskState(kind = AiTaskKind.SUMMARY, running = false, error = e.message ?: "未知错误"))
+            }
+        }
+    }
+
+    /**
+     * 启动「云端润色」后台任务。退出详情页/切屏不会取消；
+     * 结果写回会话文件（entries + orig 留档），UI 通过 aiTasks + 会话重载显示。
+     */
+    fun startPolishTask(sessionId: Long) {
+        if (_aiTasks.value[sessionId]?.running == true) return
+        putAiTask(sessionId, AiTaskState(kind = AiTaskKind.POLISH, status = "云端整课重译中…"))
+        viewModelScope.launch(Dispatchers.Default) {
+            val session = sessionManager.loadSessions().find { it.id == sessionId }
+            if (session == null) {
+                putAiTask(sessionId, AiTaskState(kind = AiTaskKind.POLISH, running = false, error = "会话不存在"))
+                return@launch
+            }
+            val r = polishSessionCloud(session) { msg ->
+                putAiTask(sessionId, AiTaskState(kind = AiTaskKind.POLISH, status = msg))
+            }
+            r.onSuccess {
+                Log.i(TAG, "polish task done: session=$sessionId")
+                putAiTask(sessionId, AiTaskState(kind = AiTaskKind.POLISH, running = false, completedAt = System.currentTimeMillis()))
+            }.onFailure { e ->
+                Log.e(TAG, "polish task failed: session=$sessionId", e)
+                putAiTask(sessionId, AiTaskState(kind = AiTaskKind.POLISH, running = false, error = e.message ?: "未知错误"))
+            }
+        }
+    }
 
     // AI batch merge buffer
     private val asrBuffer = mutableListOf<String>()
@@ -659,7 +742,26 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 val e = entries[idx]
                 val pr = pairs?.getOrNull(j)
                 if (pr != null && pr.first != "[解析失败]" && pr.first != "[无翻译]" && pr.second != "[解析失败]" && pr.second != "[无翻译]") {
-                    out.add(e.copy(english = pr.first, chinese = pr.second))
+                    val newEn = pr.first.trim()
+                    val newZh = pr.second.trim()
+                    // 润色前原文留档（详情页「（原：…）」对比）：仅在本轮确有变化且尚未留档时记录，
+                    // 多次润色保留最早的"润色前"版本。
+                    out.add(
+                        e.copy(
+                            english = newEn,
+                            chinese = newZh,
+                            origEnglish = when {
+                                newEn == e.english.trim() -> e.origEnglish
+                                e.origEnglish.isNotBlank() -> e.origEnglish
+                                else -> e.english
+                            },
+                            origChinese = when {
+                                newZh == e.chinese.trim() -> e.origChinese
+                                e.origChinese.isNotBlank() -> e.origChinese
+                                else -> e.chinese
+                            }
+                        )
+                    )
                     replaced++
                 } else out.add(e)
             }
@@ -699,6 +801,11 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
     /**
      * 详情页「课堂总结」：整课转写 → 云端大模型 → 结构化总结
      * （概要/重点+时间区间/知识点讲解/作业/复习自测/关键词），成功后写回 session.classSummary。
+     *
+     * 2026-09-29 加固（此前偶发"总结解析失败（模型输出非 JSON）"）：
+     *  1) 解析失败自动重试（最多 MAX_SUMMARY_ATTEMPTS 次），重试附加"只输出 JSON"强约束；
+     *  2) max_tokens 3500→8000（实测长课 completion 已到 3306/3500，思考+JSON 容易被截断）；
+     *  3) 失败时把模型原始输出 head/tail 打进 logcat，根因可查。
      */
     suspend fun generateSummary(
         session: TranslationSession,
@@ -711,37 +818,32 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         return try {
             val sysPrompt = ClassSummary.buildSystemPrompt()
             val usrPrompt = ClassSummary.buildUserPrompt(entries)
-            // 思考深度开到最高（用户要求 2026-09-26）：火山方舟 reasoning_effort=max
-            // （deepseek-v4 家族官方档位 none/minimal/low/high/max，最高=max；实测思考量最大）
-            val rawText = try {
-                api.cloudChat(
-                    baseUrl = settings.cloudBaseUrl,
-                    apiKey = settings.cloudApiKey,
-                    model = settings.cloudModel,
-                    system = sysPrompt,
-                    user = usrPrompt,
-                    maxTokens = 3500,
-                    temperature = 0.3,
-                    reasoningEffort = "max"
-                )
-            } catch (e: Exception) {
-                val msg = e.message ?: ""
-                if (msg.contains("400") || msg.contains("InvalidParameter") || msg.contains("reasoning", ignoreCase = true)) {
-                    Log.w(TAG, "reasoning_effort=max 被端点拒绝（${msg.take(140)}），退回默认档重试")
-                    api.cloudChat(
-                        baseUrl = settings.cloudBaseUrl,
-                        apiKey = settings.cloudApiKey,
-                        model = settings.cloudModel,
-                        system = sysPrompt,
-                        user = usrPrompt,
-                        maxTokens = 3500,
-                        temperature = 0.3
+            var summary: ClassSummary? = null
+            var lastFinish = ""
+            var attempt = 0
+            while (summary == null && attempt < MAX_SUMMARY_ATTEMPTS) {
+                attempt++
+                // 思考深度开到最高（用户要求 2026-09-26）：火山方舟 reasoning_effort=max
+                // （deepseek-v4 家族官方档位 none/minimal/low/high/max，最高=max；实测思考量最大）
+                val sys = if (attempt == 1) sysPrompt else sysPrompt + "\n" + ClassSummary.RETRY_SYSTEM_SUFFIX
+                val (raw, finish) = requestSummaryRaw(settings, sys, usrPrompt, SUMMARY_MAX_TOKENS)
+                lastFinish = finish
+                summary = ClassSummary.parseModelOutput(raw, entries, session.startTime, settings.cloudModel)
+                if (summary == null) {
+                    Log.e(
+                        TAG,
+                        "generateSummary 解析失败 attempt=$attempt/$MAX_SUMMARY_ATTEMPTS finish=$finish " +
+                            "len=${raw.length} HEAD[${raw.take(360)}] TAIL[${raw.takeLast(240)}]"
                     )
-                } else throw e
+                    if (attempt < MAX_SUMMARY_ATTEMPTS) {
+                        onProgress("模型输出格式异常，正在重试（第 ${attempt + 1}/$MAX_SUMMARY_ATTEMPTS 次）…")
+                    }
+                } else {
+                    Log.i(TAG, "generateSummary OK attempt=$attempt finish=$finish len=${raw.length}")
+                }
             }
-            val summary = ClassSummary.parseModelOutput(rawText, entries, session.startTime, settings.cloudModel)
             if (summary == null) {
-                Result.failure(Exception("总结解析失败（模型输出非 JSON）"))
+                Result.failure(Exception("总结解析失败（模型输出非 JSON，已重试 $MAX_SUMMARY_ATTEMPTS 次，finish=$lastFinish）"))
             } else {
                 sessionManager.saveSession(session.copy(classSummary = summary.toJson()))
                 Result.success(summary)
@@ -749,6 +851,46 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: Exception) {
             Log.e(TAG, "generateSummary failed", e)
             Result.failure(e)
+        }
+    }
+
+    /**
+     * 课堂总结一次性请求（含 reasoning_effort=max 的端点兼容回退）。
+     * @return (内容文本, finish_reason)；finish_reason=length 表示被 max_tokens 截断。
+     */
+    private suspend fun requestSummaryRaw(
+        settings: AppSettings,
+        sysPrompt: String,
+        usrPrompt: String,
+        maxTokens: Int
+    ): Pair<String, String> {
+        return try {
+            val r = api.cloudChatFull(
+                baseUrl = settings.cloudBaseUrl,
+                apiKey = settings.cloudApiKey,
+                model = settings.cloudModel,
+                system = sysPrompt,
+                user = usrPrompt,
+                maxTokens = maxTokens,
+                temperature = 0.3,
+                reasoningEffort = "max"
+            )
+            r.text to r.finishReason
+        } catch (e: Exception) {
+            val msg = e.message ?: ""
+            if (msg.contains("400") || msg.contains("InvalidParameter") || msg.contains("reasoning", ignoreCase = true)) {
+                Log.w(TAG, "reasoning_effort=max 被端点拒绝（${msg.take(140)}），退回默认档重试")
+                val r = api.cloudChatFull(
+                    baseUrl = settings.cloudBaseUrl,
+                    apiKey = settings.cloudApiKey,
+                    model = settings.cloudModel,
+                    system = sysPrompt,
+                    user = usrPrompt,
+                    maxTokens = maxTokens,
+                    temperature = 0.3
+                )
+                r.text to r.finishReason
+            } else throw e
         }
     }
 

@@ -12,8 +12,8 @@ android {
         applicationId = "com.classroom.translator"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.4.0"
+        versionCode = 6
+        versionName = "1.4.1"
 
         // Read MiniMax-M3 API key from local.properties (not committed)
         // gradleProperty 只读 Gradle 属性(不含 local.properties!) —— 之前编译进去的是 "null"
@@ -94,6 +94,9 @@ dependencies {
     // OkHttp + JSON
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.json:json:20231013")
+
+    // JVM 单元测试（课堂总结 JSON 解析加固回归）
+    testImplementation("junit:junit:4.13.2")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
