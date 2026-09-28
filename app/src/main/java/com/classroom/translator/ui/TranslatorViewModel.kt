@@ -828,7 +828,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 val sys = if (attempt == 1) sysPrompt else sysPrompt + "\n" + ClassSummary.RETRY_SYSTEM_SUFFIX
                 val (raw, finish) = requestSummaryRaw(settings, sys, usrPrompt, SUMMARY_MAX_TOKENS)
                 lastFinish = finish
-                summary = ClassSummary.parseModelOutput(raw, entries, session.startTime, settings.cloudModel)
+                summary = ClassSummary.parseModelOutput(raw, entries, session.startTime, settings.cloudModel, session.audioPath)
                 if (summary == null) {
                     Log.e(
                         TAG,

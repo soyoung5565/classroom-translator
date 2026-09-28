@@ -24,7 +24,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -32,6 +35,7 @@ import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
@@ -60,6 +64,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -715,6 +720,10 @@ fun SessionDetailScreen(
     val sessionManager = remember { SessionManager(context) }
     var session by remember { mutableStateOf<TranslationSession?>(null) }
     var pendingSeekSec by remember { mutableStateOf<Int?>(null) }
+    val scope = rememberCoroutineScope()
+    // 正文列表状态：总结条目点击 → 滚动到对应翻译条目；右下角"回到顶部"用
+    val listState = rememberLazyListState()
+    var highlightEntry by remember { mutableStateOf<Int?>(null) }
 
     // —— AI 课堂总结 / 云端润色 状态 ——
     // 任务跑在 ViewModel（viewModelScope）：退出本页/切屏不中断；回来时按任务态继续显示进度或结果。
@@ -732,6 +741,13 @@ fun SessionDetailScreen(
     LaunchedEffect(aiTask?.completedAt) {
         if ((aiTask?.completedAt ?: 0L) > 0L) {
             session = sessionManager.loadSessions().find { it.id == sessionId }
+        }
+    }
+    // 跳转高亮：短暂闪烁后自动消退
+    LaunchedEffect(highlightEntry) {
+        if (highlightEntry != null) {
+            delay(2800)
+            highlightEntry = null
         }
     }
 
@@ -763,6 +779,15 @@ fun SessionDetailScreen(
                     viewModel.startPolishTask(sessionId)
                 }
             }
+            // 总结条目点击：①音频跳到对应位置（有音频时） ②滚动到正文对应翻译条目并短暂高亮
+            val onJump: (Int, Int) -> Unit = { sec, entryIdx ->
+                if (sec >= 0 && s.audioPath.isNotBlank()) pendingSeekSec = sec
+                val idx = ClassSummary.resolveEntryIndex(s.entries, entryIdx, sec)
+                if (idx in s.entries.indices) {
+                    highlightEntry = idx
+                    scope.launch { listState.animateScrollToItem(idx + 1) } // +1: 总结卡占第 0 项
+                }
+            }
 
             Column(Modifier.fillMaxSize()) {
                 DetailAppBar(
@@ -782,6 +807,8 @@ fun SessionDetailScreen(
                 }
                 PairList(
                     session = s,
+                    listState = listState,
+                    highlightIndex = highlightEntry,
                     header = {
                         SummaryBlock(
                             summary = classSum,
@@ -793,10 +820,33 @@ fun SessionDetailScreen(
                             error = aiError,
                             onGenerate = onGenerate,
                             onPolish = onPolish,
-                            onSeek = { sec -> pendingSeekSec = sec },
+                            onJump = onJump,
                         )
                     },
                 )
+            }
+
+            // 右下角「回到顶部」：滚动离开顶部后出现（与总结条目跳转配合使用）
+            val showBackTop by remember { derivedStateOf { listState.firstVisibleItemIndex >= 2 } }
+            if (showBackTop) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 18.dp)
+                        .size(40.dp)
+                        .shadow(4.dp, CircleShape)
+                        .clip(CircleShape)
+                        .gradientFill(CircleShape, listOf(tk.gradA, tk.gradB))
+                        .clickable { scope.launch { listState.animateScrollToItem(0) } },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Rounded.ArrowUpward,
+                        contentDescription = "回到顶部",
+                        tint = cs.onPrimary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
     }
@@ -1092,7 +1142,7 @@ private fun SummaryBlock(
     error: String?,
     onGenerate: () -> Unit,
     onPolish: () -> Unit,
-    onSeek: (Int) -> Unit,
+    onJump: (sec: Int, entryIndex: Int) -> Unit,
 ) {
     val cs = MaterialTheme.colorScheme
     val tk = AppTheme.tokens
@@ -1209,7 +1259,7 @@ private fun SummaryBlock(
                                 Spacer(Modifier.weight(1f))
                                 if (p.startSec >= 0) {
                                     Spacer(Modifier.width(8.dp))
-                                    TimeChip(p.startSec, p.endSec, seekable = hasAudio, onSeek = onSeek)
+                                    TimeChip(p.startSec, p.endSec, p.entryIndex, enabled = hasAudio || p.entryIndex >= 0, onJump = onJump)
                                 }
                             }
                             Spacer(Modifier.height(3.dp))
@@ -1229,7 +1279,7 @@ private fun SummaryBlock(
                                 Text(ex.term, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = cs.onSurface)
                                 Spacer(Modifier.weight(1f))
                                 if (ex.startSec >= 0) {
-                                    TimeChip(ex.startSec, ex.endSec, seekable = hasAudio, onSeek = onSeek)
+                                    TimeChip(ex.startSec, ex.endSec, ex.entryIndex, enabled = hasAudio || ex.entryIndex >= 0, onJump = onJump)
                                 }
                             }
                             Spacer(Modifier.height(3.dp))
@@ -1272,7 +1322,7 @@ private fun SummaryBlock(
                                 Text(qa.q, fontSize = 12.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium, color = cs.onSurface, modifier = Modifier.weight(1f))
                                 if (qa.startSec >= 0) {
                                     Spacer(Modifier.width(6.dp))
-                                    TimeChip(qa.startSec, -1, seekable = hasAudio, onSeek = onSeek)
+                                    TimeChip(qa.startSec, -1, qa.entryIndex, enabled = hasAudio || qa.entryIndex >= 0, onJump = onJump)
                                 }
                             }
                             if (open) {
@@ -1388,9 +1438,15 @@ private fun KindChip(kind: String) {
     }
 }
 
-/** 录音时间区间小胶囊：有音频时点击跳转回放（无音频/无偏移则仅展示）。 */
+/** 录音时间区间小胶囊：点击 → 音频跳转回放 + 正文滚动到对应翻译条目（条目下标由总结数据携带）。 */
 @Composable
-private fun TimeChip(startSec: Int, endSec: Int, seekable: Boolean, onSeek: (Int) -> Unit) {
+private fun TimeChip(
+    startSec: Int,
+    endSec: Int,
+    entryIndex: Int,
+    enabled: Boolean,
+    onJump: (sec: Int, entryIndex: Int) -> Unit,
+) {
     val cs = MaterialTheme.colorScheme
     val label = if (endSec > startSec && startSec >= 0) {
         "${fmtOff(startSec)}–${fmtOff(endSec)}"
@@ -1399,13 +1455,13 @@ private fun TimeChip(startSec: Int, endSec: Int, seekable: Boolean, onSeek: (Int
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(cs.primaryContainer.copy(alpha = if (seekable) 0.75f else 0.45f))
-            .clickable(enabled = seekable) { onSeek(startSec) }
+            .background(cs.primaryContainer.copy(alpha = if (enabled) 0.75f else 0.45f))
+            .clickable(enabled = enabled) { onJump(startSec, entryIndex) }
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
         Icon(
             Icons.Rounded.PlayArrow,
-            contentDescription = if (seekable) "跳转回放" else null,
+            contentDescription = if (enabled) "跳转回放" else null,
             tint = cs.onPrimaryContainer,
             modifier = Modifier.size(12.dp),
         )
@@ -1430,27 +1486,31 @@ private fun fmtMs(ms: Long): String {
 @Composable
 private fun PairList(
     session: TranslationSession,
+    listState: LazyListState,
+    highlightIndex: Int? = null,
     header: (@Composable () -> Unit)? = null,
 ) {
     val cs = MaterialTheme.colorScheme
     val tk = AppTheme.tokens
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(top = 4.dp, bottom = 16.dp),
+        contentPadding = PaddingValues(top = 4.dp, bottom = 84.dp),
     ) {
         if (header != null) {
             item(key = "ai-summary") { header() }
         }
-        items(session.entries, key = { it.timestamp + it.chinese.hashCode() }) { e ->
+        itemsIndexed(session.entries, key = { _, e -> e.timestamp + e.chinese.hashCode() }) { idx, e ->
             PairCard(
                 ts = e.timestamp.take(5),
                 zh = e.chinese,
                 en = e.english,
                 zhPrev = e.origChinese,
                 enPrev = e.origEnglish,
+                highlight = highlightIndex == idx,
                 modifier = Modifier,
             )
         }
@@ -1464,6 +1524,7 @@ private fun PairCard(
     en: String,
     zhPrev: String = "",
     enPrev: String = "",
+    highlight: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val cs = MaterialTheme.colorScheme
@@ -1509,8 +1570,8 @@ private fun PairCard(
             .fillMaxWidth()
             .shadow(2.dp, shape)
             .clip(shape)
-            .background(cs.surfaceContainerLow)
-            .border(1.dp, tk.hairline, shape)
+            .background(if (highlight) cs.primaryContainer.copy(alpha = 0.55f) else cs.surfaceContainerLow)
+            .border(1.dp, if (highlight) cs.primary.copy(alpha = 0.65f) else tk.hairline, shape)
             .padding(horizontal = 13.dp, vertical = 11.dp),
     ) {
         Column {

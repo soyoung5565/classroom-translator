@@ -146,4 +146,54 @@ class ClassSummaryParseTest {
         val s = parse("$good\n\n$good")
         assertNotNull(s)
     }
+
+    // ---- 2026-09-29 真机问题修复回归：时间映射基准 = 录音文件名；entryIndex 留档 ----
+
+    @Test
+    fun recordingFilenameBaseFixesOffsetMapping() {
+        // 真机案例：sessionStart=21:06（保存时刻），真正录音起点是文件名里的 20:57:50。
+        // 旧算法：61s 的条目被错算成 85971s（23:52:51）；新算法必须以文件名为基准。
+        val phoneEntries = listOf(
+            TranslationEntryData(timestamp = "20:58:51", english = "a", chinese = "甲", startSec = -1, endSec = -1),
+            TranslationEntryData(timestamp = "20:58:59", english = "b", chinese = "乙", startSec = -1, endSec = -1),
+            TranslationEntryData(timestamp = "20:59:04", english = "c", chinese = "丙", startSec = -1, endSec = -1),
+        )
+        val raw = """{"overview":"x","points":[{"title":"T1","detail":"D1","at":0},{"title":"T2","detail":"D2","at":1}]}"""
+        val s = ClassSummary.parseModelOutput(
+            raw, phoneEntries, "21:06", "m", "/storage/x/recordings/recording_20260924_205750.wav"
+        )
+        assertNotNull(s)
+        assertEquals(61, s!!.points[0].startSec)
+        assertEquals(69, s.points[1].startSec)
+        assertEquals(0, s.points[0].entryIndex)
+        assertEquals(1, s.points[1].entryIndex)
+    }
+
+    @Test
+    fun midnightCrossStillHandled() {
+        val es = listOf(
+            TranslationEntryData(timestamp = "00:01:30", english = "a", chinese = "甲", startSec = -1, endSec = -1),
+        )
+        val raw = """{"overview":"x","points":[{"title":"T","detail":"D","at":0}]}"""
+        val s = ClassSummary.parseModelOutput(
+            raw, es, "23:58", "m", "/x/recordings/recording_20260924_235800.wav"
+        )
+        assertNotNull(s)
+        assertEquals(210, s!!.points[0].startSec)
+    }
+
+    @Test
+    fun entryIndexPersistsAndResolves() {
+        val s = parse(good)
+        assertNotNull(s)
+        assertEquals(1, s!!.points[0].entryIndex)   // at:1
+        val back = ClassSummary.fromJson(s.toJson())
+        assertNotNull(back)
+        assertEquals(1, back!!.points[0].entryIndex) // 持久化往返
+        assertEquals(8, back.questions[0].entryIndex) // questions at:8 → entryIndex 8
+        // resolve：新总结直接用 idx；旧总结按秒数就近匹配；匹配不到 → -1
+        assertEquals(2, ClassSummary.resolveEntryIndex(entries, 2, -1))
+        assertEquals(1, ClassSummary.resolveEntryIndex(entries, -1, 20))
+        assertEquals(-1, ClassSummary.resolveEntryIndex(entries, -1, 99999))
+    }
 }

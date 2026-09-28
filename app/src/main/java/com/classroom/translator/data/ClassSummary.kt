@@ -4,14 +4,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
 
-/** 课堂总结 · 重点条目（含录音时间区间，秒） */
-data class SummaryPoint(val title: String, val detail: String, val startSec: Int, val endSec: Int)
+/** 课堂总结 · 重点条目（含录音时间区间，秒；entryIndex=对应转写条目下标，-1=未知） */
+data class SummaryPoint(val title: String, val detail: String, val startSec: Int, val endSec: Int, val entryIndex: Int = -1)
 
 /** 课堂总结 · 知识点讲解（词汇/语法/术语/概念） */
-data class SummaryExplain(val term: String, val kind: String, val explanation: String, val startSec: Int, val endSec: Int)
+data class SummaryExplain(val term: String, val kind: String, val explanation: String, val startSec: Int, val endSec: Int, val entryIndex: Int = -1)
 
 /** 课堂总结 · 复习自测题 */
-data class SummaryQA(val q: String, val a: String, val startSec: Int)
+data class SummaryQA(val q: String, val a: String, val startSec: Int, val entryIndex: Int = -1)
 
 /**
  * 结构化课堂总结 —— 由云端大模型生成（默认火山方舟 deepseek-v4-1-flash）。
@@ -41,6 +41,7 @@ data class ClassSummary(
                     put("detail", p.detail)
                     put("startSec", p.startSec)
                     put("endSec", p.endSec)
+                    put("entryIdx", p.entryIndex)
                 })
             }
         })
@@ -52,6 +53,7 @@ data class ClassSummary(
                     put("exp", e.explanation)
                     put("startSec", e.startSec)
                     put("endSec", e.endSec)
+                    put("entryIdx", e.entryIndex)
                 })
             }
         })
@@ -62,6 +64,7 @@ data class ClassSummary(
                     put("q", q.q)
                     put("a", q.a)
                     put("startSec", q.startSec)
+                    put("entryIdx", q.entryIndex)
                 })
             }
         })
@@ -86,7 +89,8 @@ data class ClassSummary(
                                 p.optString("title", "重点"),
                                 p.optString("detail", ""),
                                 p.optInt("startSec", -1),
-                                p.optInt("endSec", -1)
+                                p.optInt("endSec", -1),
+                                p.optInt("entryIdx", -1)
                             )
                         )
                     }
@@ -101,7 +105,8 @@ data class ClassSummary(
                                 p.optString("kind", "term"),
                                 p.optString("exp", ""),
                                 p.optInt("startSec", -1),
-                                p.optInt("endSec", -1)
+                                p.optInt("endSec", -1),
+                                p.optInt("entryIdx", -1)
                             )
                         )
                     }
@@ -117,7 +122,14 @@ data class ClassSummary(
                 o.optJSONArray("questions")?.let { arr ->
                     for (i in 0 until arr.length()) {
                         val p = arr.optJSONObject(i) ?: continue
-                        qs.add(SummaryQA(p.optString("q", ""), p.optString("a", ""), p.optInt("startSec", -1)))
+                        qs.add(
+                            SummaryQA(
+                                p.optString("q", ""),
+                                p.optString("a", ""),
+                                p.optInt("startSec", -1),
+                                p.optInt("entryIdx", -1)
+                            )
+                        )
                     }
                 }
                 val kw = ArrayList<String>()
@@ -172,9 +184,20 @@ data class ClassSummary(
             return sb.toString()
         }
 
-        /** 条目录音偏移列表（start, end 秒；-1 = 未知）。优先条目自带偏移；回退解析时间戳。 */
-        fun entryOffsets(entries: List<TranslationEntryData>, sessionStart: String): List<Pair<Int, Int>> {
-            val base = parseClockSec(sessionStart)
+        /**
+         * 条目录音偏移列表（start, end 秒；-1 = 未知）。优先条目自带偏移；回退解析时间戳。
+         *
+         * 2026-09-29 修复「时间完全错乱」：时间戳回退换算的基准必须是**录音开始时间**——
+         * 从音频文件名 recording_YYYYMMDD_HHMMSS.wav 取（真实录音起点）；
+         * sessionStart（保存时刻，等于结束时间）只能兜底。旧算法拿保存时刻当基准，
+         * 差值变负数后错误 +86400 回绕 → 61 秒的条目标成 23小时+。
+         */
+        fun entryOffsets(
+            entries: List<TranslationEntryData>,
+            sessionStart: String,
+            audioPath: String = ""
+        ): List<Pair<Int, Int>> {
+            val base = recordingStartSec(audioPath) ?: parseClockSec(sessionStart)
             val raw = entries.map { e ->
                 when {
                     e.startSec >= 0 -> e.startSec to (if (e.endSec >= e.startSec) e.endSec else -1)
@@ -189,7 +212,8 @@ data class ClassSummary(
                             val ts = parseClockSec(e.timestamp)
                             if (ts != null && base != null) {
                                 var d = ts - base
-                                if (d < 0) d += 86400
+                                if (d < -12 * 3600) d += 86400 // 跨午夜（录音 23:5x 开始、条目 00:0x）
+                                if (d < 0) d = 0                // 基准前几秒的零星条目 → 归 0
                                 d to -1
                             } else -1 to -1
                         }
@@ -206,17 +230,35 @@ data class ClassSummary(
             }
         }
 
+        /** 录音开始时刻（秒）——从 audioPath 里的 recording_yyyyMMdd_HHmmss 文件名解析。 */
+        private fun recordingStartSec(audioPath: String?): Int? {
+            if (audioPath.isNullOrBlank()) return null
+            val m = Regex("recording_\\d{8}_(\\d{2})(\\d{2})(\\d{2})").find(audioPath) ?: return null
+            return m.groupValues[1].toInt() * 3600 + m.groupValues[2].toInt() * 60 + m.groupValues[3].toInt()
+        }
+
+        /** 把总结条目解析到"对应转写条目下标"（新总结直接带 entryIdx；旧总结按秒数就近匹配）。 */
+        fun resolveEntryIndex(entries: List<TranslationEntryData>, entryIndex: Int, startSec: Int): Int {
+            if (entryIndex in entries.indices) return entryIndex
+            if (startSec >= 0) {
+                val i = entries.indexOfFirst { it.startSec >= 0 && kotlin.math.abs(it.startSec - startSec) <= 3 }
+                if (i >= 0) return i
+            }
+            return -1
+        }
+
         /** 解析模型输出 → ClassSummary（含 at 编号 → 秒区间 映射）。失败返回 null。 */
         fun parseModelOutput(
             raw: String,
             entries: List<TranslationEntryData>,
             sessionStart: String,
-            model: String
+            model: String,
+            audioPath: String = ""
         ): ClassSummary? {
             for (cand in jsonCandidates(raw)) {
                 val o = tryParseJsonObject(cand) ?: continue
                 if (KNOWN_KEYS.none { o.has(it) }) continue
-                return buildFrom(o, entries, sessionStart, model)
+                return buildFrom(o, entries, sessionStart, model, audioPath)
             }
             return null
         }
@@ -226,10 +268,11 @@ data class ClassSummary(
             o: JSONObject,
             entries: List<TranslationEntryData>,
             sessionStart: String,
-            model: String
+            model: String,
+            audioPath: String = ""
         ): ClassSummary? {
             return try {
-                val offs = entryOffsets(entries, sessionStart)
+                val offs = entryOffsets(entries, sessionStart, audioPath)
                 val lastEnd = offs.map { it.second }.lastOrNull { it >= 0 } ?: -1
 
                 fun secAt(idx: Int): Int = if (idx in offs.indices) offs[idx].first else -1
@@ -250,7 +293,7 @@ data class ClassSummary(
                 ptsRaw.forEachIndexed { i, t ->
                     val s = secAt(t.third)
                     val nxt = ptsRaw.getOrNull(i + 1)?.third?.let { secAt(it) }
-                    points.add(SummaryPoint(t.first, t.second, s, rangeEnd(s, nxt)))
+                    points.add(SummaryPoint(t.first, t.second, s, rangeEnd(s, nxt), t.third))
                 }
 
                 val exJson = o.optJSONArray("explainers") ?: JSONArray()
@@ -258,7 +301,8 @@ data class ClassSummary(
                 val explains = ArrayList<SummaryExplain>()
                 for (i in 0 until exJson.length()) {
                     val p = exJson.optJSONObject(i) ?: continue
-                    val s = secAt(p.optInt("at", -1))
+                    val at = p.optInt("at", -1)
+                    val s = secAt(at)
                     val nextS = exAts.drop(i + 1).firstOrNull { it >= 0 }?.let { secAt(it) }
                     val e = if (s >= 0) {
                         minOf(rangeEnd(s, nextS), s + 90).coerceAtLeast(s + 10)
@@ -269,7 +313,8 @@ data class ClassSummary(
                             kind = p.optString("kind", "term"),
                             explanation = p.optString("exp", p.optString("explanation", "")),
                             startSec = s,
-                            endSec = e
+                            endSec = e,
+                            entryIndex = at
                         )
                     )
                 }
@@ -286,7 +331,8 @@ data class ClassSummary(
                 o.optJSONArray("questions")?.let { arr ->
                     for (i in 0 until arr.length()) {
                         val p = arr.optJSONObject(i) ?: continue
-                        qs.add(SummaryQA(p.optString("q", ""), p.optString("a", ""), secAt(p.optInt("at", -1))))
+                        val at = p.optInt("at", -1)
+                        qs.add(SummaryQA(p.optString("q", ""), p.optString("a", ""), secAt(at), at))
                     }
                 }
 
