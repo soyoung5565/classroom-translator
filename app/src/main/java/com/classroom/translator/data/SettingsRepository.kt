@@ -23,9 +23,9 @@ data class AppSettings(
     val translateModel: String = "qwen3-1.7b",
     // 云端翻译 (流式后覆盖 / 双端矫正): 默认值由 BuildConfig 注入 (M3 直连 minimaxi.com),
     // 用户可在设置页改 Base URL/Key/Model 切换其他 provider。
-    val cloudApiKey: String = com.classroom.translator.BuildConfig.MINIMAX_API_KEY,
-    val cloudBaseUrl: String = com.classroom.translator.BuildConfig.MINIMAX_BASE_URL,
-    val cloudModel: String = com.classroom.translator.BuildConfig.MINIMAX_MODEL,
+    val cloudApiKey: String = com.classroom.translator.BuildConfig.VOLC_API_KEY,
+    val cloudBaseUrl: String = com.classroom.translator.BuildConfig.VOLC_BASE_URL,
+    val cloudModel: String = com.classroom.translator.BuildConfig.VOLC_MODEL,
     val chunkSeconds: Int = 8,
     val asrLanguage: String = "auto",  // 混说关键: auto 让模型自动检测, 支持马来+英语+中文混说
     val asrMode: String = "local_vllm"
@@ -68,9 +68,9 @@ class SettingsRepository(private val context: Context) {
             translateBaseUrl = if (isOldTrans || rawTransUrl.isBlank()) "http://127.0.0.1:8002/v1" else rawTransUrl,
             translateModel = if (isOldTrans || rawTransModel.isBlank()) "qwen3-1.7b" else rawTransModel,
             // 云端覆盖默认从 BuildConfig (编译注入),用户可改
-            cloudApiKey = prefs[CLOUD_API_KEY]?.takeIf { it.isNotBlank() } ?: com.classroom.translator.BuildConfig.MINIMAX_API_KEY,
-            cloudBaseUrl = prefs[CLOUD_BASE_URL]?.takeIf { it.isNotBlank() } ?: com.classroom.translator.BuildConfig.MINIMAX_BASE_URL,
-            cloudModel = prefs[CLOUD_MODEL]?.takeIf { it.isNotBlank() } ?: com.classroom.translator.BuildConfig.MINIMAX_MODEL,
+            cloudApiKey = prefs[CLOUD_API_KEY]?.takeIf { it.isNotBlank() } ?: com.classroom.translator.BuildConfig.VOLC_API_KEY,
+            cloudBaseUrl = prefs[CLOUD_BASE_URL]?.takeIf { it.isNotBlank() } ?: com.classroom.translator.BuildConfig.VOLC_BASE_URL,
+            cloudModel = prefs[CLOUD_MODEL]?.takeIf { it.isNotBlank() } ?: com.classroom.translator.BuildConfig.VOLC_MODEL,
             chunkSeconds = prefs[CHUNK_SECONDS] ?: 8,
             asrLanguage = prefs[ASR_LANGUAGE] ?: "auto",
             asrMode = if (rawAsrMode.isBlank() || rawAsrMode == "mimo") "local_vllm" else rawAsrMode
@@ -94,9 +94,9 @@ class SettingsRepository(private val context: Context) {
                 translateApiKey = prefs[TRANSLATE_API_KEY] ?: "REDACTED_KEY",
                 translateBaseUrl = prefs[TRANSLATE_BASE_URL] ?: "http://127.0.0.1:8002/v1",
                 translateModel = prefs[TRANSLATE_MODEL] ?: "qwen3-1.7b",
-                cloudApiKey = prefs[CLOUD_API_KEY] ?: com.classroom.translator.BuildConfig.MINIMAX_API_KEY,
-                cloudBaseUrl = prefs[CLOUD_BASE_URL] ?: com.classroom.translator.BuildConfig.MINIMAX_BASE_URL,
-                cloudModel = prefs[CLOUD_MODEL] ?: com.classroom.translator.BuildConfig.MINIMAX_MODEL,
+                cloudApiKey = prefs[CLOUD_API_KEY] ?: com.classroom.translator.BuildConfig.VOLC_API_KEY,
+                cloudBaseUrl = prefs[CLOUD_BASE_URL] ?: com.classroom.translator.BuildConfig.VOLC_BASE_URL,
+                cloudModel = prefs[CLOUD_MODEL] ?: com.classroom.translator.BuildConfig.VOLC_MODEL,
                 chunkSeconds = prefs[CHUNK_SECONDS] ?: 8,
                 asrLanguage = prefs[ASR_LANGUAGE] ?: "en",
                 asrMode = prefs[ASR_MODE] ?: "dashscope"

@@ -14,6 +14,7 @@ import com.classroom.translator.local.LocalLlmServerManager
 import com.classroom.translator.audio.PlaybackCaptureRecorder
 import com.classroom.translator.audio.AudioConverter
 import com.classroom.translator.data.AppSettings
+import com.classroom.translator.data.ClassSummary
 import com.classroom.translator.data.SettingsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -48,7 +49,10 @@ data class TranslationEntry(
     val timestamp: String = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
         .format(java.util.Date()),
     val latencyMs: Long = 0,
-    val isCorrected: Boolean = false
+    val isCorrected: Boolean = false,
+    /** 录音内偏移秒数（课堂总结时间区间 / 跳转回放用）；-1 = 未知 */
+    val startSec: Int = -1,
+    val endSec: Int = -1
 )
 
 data class TranslatorUiState(
@@ -85,6 +89,9 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
     private var mediaProjection: android.media.projection.MediaProjection? = null
 
     private var sessionStartTime: String = ""
+
+    /** 本次录音起点（毫秒）；停止录音后归零。用于条目→录音偏移换算 */
+    private var recStartMs = 0L
 
     private val _state = MutableStateFlow(TranslatorUiState())
     val state: StateFlow<TranslatorUiState> = _state.asStateFlow()
@@ -123,6 +130,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         audioRecorder.start()
+        recStartMs = System.currentTimeMillis()
         // 【防冻结】会话期间跑前台服务：否则 App 退到后台会被 Android App Freezer 冻结，
         // 连带 ProcessBuilder 拉起的本地推理服务一起冻住（实测：切微信后服务不再响应）
         runCatching { com.classroom.translator.SessionForegroundService.start(getApplication()) }
@@ -253,7 +261,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 api.translate(baseUrl=settings.translateBaseUrl, apiKey=settings.translateApiKey, model=settings.translateModel, text=english)
             } catch (e: Exception) { "[翻译失败: ${e.message}]" }
             val latency = System.currentTimeMillis() - startTime
-            val entry = TranslationEntry(english = english, chinese = chinese, latencyMs = latency)
+            val entry = TranslationEntry(english = english, chinese = chinese, latencyMs = latency, startSec = offsetNow())
             _state.value = _state.value.copy(entries = _state.value.entries + entry, isProcessing = false, status = "正在听...", error = null)
             autoSave(entry)
             Log.i(TAG, "Done: ${english.take(50)}... (${latency}ms)")
@@ -422,6 +430,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         // （之前全项目没有任何地方释放它——授权一次后前台服务永远活着，
         //   系统持续捕获音频 = 翻译停了手机还在耗电发热，2026-09-22 发现）
         if (releaseProj) releaseProjection()
+        recStartMs = 0L
 
         _state.value = _state.value.copy(
             isRecording = false,
@@ -461,7 +470,21 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         val endTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         val now = if (sessionStartTime.isBlank()) endTime else sessionStartTime
-        val entries = currentEntries.map { TranslationEntryData(it.timestamp, it.english, it.chinese) }
+        val entries = currentEntries.mapIndexed { i, e ->
+            val s = e.startSec
+            val end = when {
+                e.endSec >= 0 -> e.endSec
+                else -> {
+                    val nxt = currentEntries.drop(i + 1).firstOrNull { it.startSec >= 0 }?.startSec
+                    when {
+                        nxt != null && nxt > s && s >= 0 -> nxt
+                        s >= 0 -> s + 15
+                        else -> -1
+                    }
+                }
+            }
+            TranslationEntryData(timestamp = e.timestamp, english = e.english, chinese = e.chinese, startSec = s, endSec = end)
+        }
         val summary = currentEntries.first().english.let { if (it.length > 50) it.take(50) + "..." else it }
         val session = TranslationSession(id = System.currentTimeMillis(), date = date, startTime = now, endTime = endTime, entries = entries, summary = summary)
 
@@ -469,24 +492,18 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         sessionManager.saveSession(session.copy(audioPath = savedAudioPath ?: ""))
         Log.i(TAG, "Session saved with audio: $savedAudioPath, ${entries.size} entries")
 
-        // Background full-text correction, then re-save
+        // 课后整课重译（"润色"核心）：分块云端重译 → 替换后重存并标记 polished。
+        // (2026-09-26: 从"一次性全量"改为分块, 避免长会话单请求超限; 云端默认切火山 ds4.1)
         kotlinx.coroutines.GlobalScope.launch(Dispatchers.Default) {
             try {
                 _state.value = _state.value.copy(status = "全文修正中...")
-                val allSegments = currentEntries.map { it.english }
-                // Cloud path: M3 via Anthropic protocol
-                val corrections = api.batchTranslateAndMergeCloud(
-                cloudBaseUrl = _state.value.settings.cloudBaseUrl,
-                cloudApiKey = _state.value.settings.cloudApiKey,
-                cloudModel = _state.value.settings.cloudModel,
-                segments = allSegments
-            )
-                if (corrections.size == currentEntries.size) {
-                    val corrected = corrections.mapIndexed { i, (en, zh) ->
-                        TranslationEntryData(entries[i].timestamp, en, zh)
-                    }
-                    sessionManager.saveSession(session.copy(entries = corrected, audioPath = savedAudioPath ?: ""))
-                    Log.i(TAG, "Full-text correction applied: ${corrected.size} entries")
+                val r = cloudReTranslate(entries) { done, total ->
+                    _state.value = _state.value.copy(status = "全文修正中 $done/$total")
+                }
+                if (r != null && r.second > 0) {
+                    val (newEntries, replaced) = r
+                    sessionManager.saveSession(session.copy(entries = newEntries, audioPath = savedAudioPath ?: "", polished = true))
+                    Log.i(TAG, "Full-text correction applied: $replaced/${entries.size} entries")
                 }
             } catch (e: Exception) { Log.e(TAG, "Full-text correction failed: ${e.message}") }
             _state.value = _state.value.copy(entries = emptyList(), status = "已保存")
@@ -588,7 +605,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                         api.translate(baseUrl = settings.translateBaseUrl, apiKey = settings.translateApiKey,
                             model = settings.translateModel, text = raw)
                     } catch (e: Exception) { "[翻译失败: ${e.message}]" }
-                    newEntries.add(TranslationEntry(english = raw, chinese = chinese, timestamp = ts))
+                    newEntries.add(TranslationEntry(english = raw, chinese = chinese, timestamp = ts, startSec = start.toInt(), endSec = end.toInt()))
                 }
                 _state.value = _state.value.copy(
                     entries = _state.value.entries + newEntries,
@@ -612,6 +629,129 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         return "%02d:%02d".format(m, s)
     }
 
+    /**
+     * 云端整课重译（"润色"核心）—— 分块执行（20 条/块），逐块严格 1:1 替换。
+     * @return (替换后的条目, 成功替换条数)；条目为空返回 null；某块失败该块保留原文。
+     */
+    private suspend fun cloudReTranslate(
+        entries: List<TranslationEntryData>,
+        onProgress: (Int, Int) -> Unit = { _, _ -> }
+    ): Pair<List<TranslationEntryData>, Int>? {
+        if (entries.isEmpty()) return null
+        val settings = _state.value.settings
+        val out = ArrayList<TranslationEntryData>(entries.size)
+        var replaced = 0
+        var done = 0
+        for (chunk in entries.indices.chunked(20)) {
+            val segs = chunk.map { entries[it].english }
+            val pairs = try {
+                api.cloudBatchTranslate(
+                    baseUrl = settings.cloudBaseUrl,
+                    apiKey = settings.cloudApiKey,
+                    model = settings.cloudModel,
+                    segments = segs
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "cloudReTranslate chunk failed: ${e.message}")
+                null
+            }
+            chunk.forEachIndexed { j, idx ->
+                val e = entries[idx]
+                val pr = pairs?.getOrNull(j)
+                if (pr != null && pr.first != "[解析失败]" && pr.first != "[无翻译]" && pr.second != "[解析失败]" && pr.second != "[无翻译]") {
+                    out.add(e.copy(english = pr.first, chinese = pr.second))
+                    replaced++
+                } else out.add(e)
+            }
+            done += chunk.size
+            onProgress(done, entries.size)
+        }
+        return out to replaced
+    }
+
+    /**
+     * 详情页「云端润色」：对已保存会话做整课重译，成功后写回存储。
+     * 对应设计稿"课后整课润色：会话结束后按上下文重译,术语更一致"（手动触发版；
+     * finishSession 结束时会自动做一次）。
+     */
+    suspend fun polishSessionCloud(
+        session: TranslationSession,
+        onProgress: (String) -> Unit = {}
+    ): Result<TranslationSession> {
+        val settings = _state.value.settings
+        onProgress("云端整课重译中…（${settings.cloudModel}）")
+        return try {
+            val r = cloudReTranslate(session.entries) { done, total -> onProgress("云端整课重译中 $done/$total") }
+            if (r == null || r.second == 0) {
+                Result.failure(Exception("云端未返回有效译文"))
+            } else {
+                val updated = session.copy(entries = r.first, polished = true)
+                sessionManager.saveSession(updated)
+                Log.i(TAG, "polishSessionCloud: ${r.second}/${session.entries.size} replaced")
+                Result.success(updated)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "polishSessionCloud failed", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * 详情页「课堂总结」：整课转写 → 云端大模型 → 结构化总结
+     * （概要/重点+时间区间/知识点讲解/作业/复习自测/关键词），成功后写回 session.classSummary。
+     */
+    suspend fun generateSummary(
+        session: TranslationSession,
+        onProgress: (String) -> Unit = {}
+    ): Result<ClassSummary> {
+        val settings = _state.value.settings
+        val entries = session.entries
+        if (entries.isEmpty()) return Result.failure(Exception("没有转写内容"))
+        onProgress("正在生成课堂总结…（${settings.cloudModel}，思考深度最高档）")
+        return try {
+            val sysPrompt = ClassSummary.buildSystemPrompt()
+            val usrPrompt = ClassSummary.buildUserPrompt(entries)
+            // 思考深度开到最高（用户要求 2026-09-26）：火山方舟 reasoning_effort=max
+            // （deepseek-v4 家族官方档位 none/minimal/low/high/max，最高=max；实测思考量最大）
+            val rawText = try {
+                api.cloudChat(
+                    baseUrl = settings.cloudBaseUrl,
+                    apiKey = settings.cloudApiKey,
+                    model = settings.cloudModel,
+                    system = sysPrompt,
+                    user = usrPrompt,
+                    maxTokens = 3500,
+                    temperature = 0.3,
+                    reasoningEffort = "max"
+                )
+            } catch (e: Exception) {
+                val msg = e.message ?: ""
+                if (msg.contains("400") || msg.contains("InvalidParameter") || msg.contains("reasoning", ignoreCase = true)) {
+                    Log.w(TAG, "reasoning_effort=max 被端点拒绝（${msg.take(140)}），退回默认档重试")
+                    api.cloudChat(
+                        baseUrl = settings.cloudBaseUrl,
+                        apiKey = settings.cloudApiKey,
+                        model = settings.cloudModel,
+                        system = sysPrompt,
+                        user = usrPrompt,
+                        maxTokens = 3500,
+                        temperature = 0.3
+                    )
+                } else throw e
+            }
+            val summary = ClassSummary.parseModelOutput(rawText, entries, session.startTime, settings.cloudModel)
+            if (summary == null) {
+                Result.failure(Exception("总结解析失败（模型输出非 JSON）"))
+            } else {
+                sessionManager.saveSession(session.copy(classSummary = summary.toJson()))
+                Result.success(summary)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "generateSummary failed", e)
+            Result.failure(e)
+        }
+    }
+
 
     /**
      * 双翻译云端覆盖：每 3 条触发一次云端 M3 批量翻译，
@@ -630,10 +770,10 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 val recent = currentEntries.takeLast(5)
                 val segments = recent.map { it.english }
                 // Cloud path: M3 via Anthropic protocol (REPLACES local, not "corrects")
-                val corrections = api.batchTranslateAndMergeCloud(
-                    cloudBaseUrl = settings.cloudBaseUrl,
-                    cloudApiKey = settings.cloudApiKey,
-                    cloudModel = settings.cloudModel,
+                val corrections = api.cloudBatchTranslate(
+                    baseUrl = settings.cloudBaseUrl,
+                    apiKey = settings.cloudApiKey,
+                    model = settings.cloudModel,
                     segments = segments
                 )
                 Log.i(TAG, "Cloud override result: ${corrections.size} items")
@@ -666,7 +806,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         try {
             val chinese = api.translate(baseUrl = settings.translateBaseUrl, apiKey = settings.translateApiKey,
                 model = settings.translateModel, text = text)
-            val entry = TranslationEntry(english = text, chinese = chinese, latencyMs = System.currentTimeMillis() - startTime)
+            val entry = TranslationEntry(english = text, chinese = chinese, latencyMs = System.currentTimeMillis() - startTime, startSec = offsetNow())
             _state.value = _state.value.copy(entries = _state.value.entries + entry)
             autoSave(entry)
         } catch (e: Exception) { Log.e(TAG, "Merge translate failed", e) }
@@ -686,6 +826,10 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    /** 当前时刻相对本次录音起点的偏移秒数（-1 = 非录音态，如种子数据/整课导入） */
+    private fun offsetNow(): Int =
+        if (recStartMs > 0) ((System.currentTimeMillis() - recStartMs) / 1000).toInt() else -1
+
     internal fun addOrMergeEntry(text: String, chinese: String, timestamp: String? = null) {
         val entries = _state.value.entries
         val last = entries.lastOrNull()
@@ -701,8 +845,8 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 Log.i(TAG, "merge continuation: ${t.take(40)}")
             }
             else -> {
-                val entry = if (timestamp != null) TranslationEntry(english = text, chinese = chinese, timestamp = timestamp)
-                else TranslationEntry(english = text, chinese = chinese)
+                val entry = if (timestamp != null) TranslationEntry(english = text, chinese = chinese, timestamp = timestamp, startSec = offsetNow())
+                else TranslationEntry(english = text, chinese = chinese, startSec = offsetNow())
                 _state.value = _state.value.copy(entries = entries + entry)
                 autoSave(entry)
             }

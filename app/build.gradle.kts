@@ -12,8 +12,8 @@ android {
         applicationId = "com.classroom.translator"
         minSdk = 26
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.3.1"
+        versionCode = 5
+        versionName = "1.4.0"
 
         // Read MiniMax-M3 API key from local.properties (not committed)
         // gradleProperty 只读 Gradle 属性(不含 local.properties!) —— 之前编译进去的是 "null"
@@ -29,6 +29,17 @@ android {
         buildConfigField("String", "MINIMAX_API_KEY", "\"$minimaxKey\"")
         buildConfigField("String", "MINIMAX_BASE_URL", "\"https://api.minimaxi.com/anthropic\"")
         buildConfigField("String", "MINIMAX_MODEL", "\"MiniMax-M3\"")
+
+        // Volcengine ARK Agent Plan key (同一个 local.properties 读取方式) — 2026-09-26 大模型切火山
+        val lpVolc = if (lp.exists()) {
+            lp.readLines()
+                .mapNotNull { line -> val i = line.indexOf('='); if (i <= 0) null else line.substring(0, i).trim() to line.substring(i + 1).trim() }
+                .toMap()["VOLC_API_KEY"]
+        } else null
+        val volcKey = providers.gradleProperty("VOLC_API_KEY").orNull ?: lpVolc
+        buildConfigField("String", "VOLC_API_KEY", "\"$volcKey\"")
+        buildConfigField("String", "VOLC_BASE_URL", "\"https://ark.cn-beijing.volces.com/api/plan/v3\"")
+        buildConfigField("String", "VOLC_MODEL", "\"deepseek-v4-1-flash\"")
     }
 
     buildFeatures {

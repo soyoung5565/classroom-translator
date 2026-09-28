@@ -12,7 +12,10 @@ import java.util.Locale
 data class TranslationEntryData(
     val timestamp: String = "",
     val english: String = "",
-    val chinese: String = ""
+    val chinese: String = "",
+    /** 录音内偏移秒数（-1 = 未知）；课堂总结的"录音时间区间"依赖它 */
+    val startSec: Int = -1,
+    val endSec: Int = -1
 )
 
 data class TranslationSession(
@@ -22,7 +25,11 @@ data class TranslationSession(
     val endTime: String = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()),
     val entries: List<TranslationEntryData> = emptyList(),
     val summary: String = "",
-    val audioPath: String = ""
+    val audioPath: String = "",
+    /** AI 课堂总结（JSON 字符串，见 ClassSummary）；空 = 尚未生成 */
+    val classSummary: String = "",
+    /** 会话结束后是否已云端整课重译（润色） */
+    val polished: Boolean = false
 ) {
     val entryCount: Int get() = entries.size
 }
@@ -46,12 +53,16 @@ class SessionManager(private val context: Context) {
                 put("endTime", session.endTime)
                 put("summary", session.summary)
                 put("audioPath", session.audioPath)
+                put("classSummary", session.classSummary)
+                put("polished", session.polished)
                 put("entries", JSONArray().apply {
                     session.entries.forEach { entry ->
                         put(JSONObject().apply {
                             put("timestamp", entry.timestamp)
                             put("english", entry.english)
                             put("chinese", entry.chinese)
+                            put("startSec", entry.startSec)
+                            put("endSec", entry.endSec)
                         })
                     }
                 })
@@ -138,7 +149,9 @@ class SessionManager(private val context: Context) {
             TranslationEntryData(
                 timestamp = obj.optString("timestamp", ""),
                 english = obj.optString("english", ""),
-                chinese = obj.optString("chinese", "")
+                chinese = obj.optString("chinese", ""),
+                startSec = obj.optInt("startSec", -1),
+                endSec = obj.optInt("endSec", -1)
             )
         }
         return TranslationSession(
@@ -148,7 +161,9 @@ class SessionManager(private val context: Context) {
             endTime = json.optString("endTime", ""),
             entries = entries,
             summary = json.optString("summary", ""),
-                audioPath = json.optString("audioPath", "")
+                audioPath = json.optString("audioPath", ""),
+                classSummary = json.optString("classSummary", ""),
+                polished = json.optBoolean("polished", false)
         )
     }
 

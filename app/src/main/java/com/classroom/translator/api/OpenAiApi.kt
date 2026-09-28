@@ -26,7 +26,7 @@ class OpenAiApi {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(120, TimeUnit.SECONDS)
+        .readTimeout(180, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
@@ -172,149 +172,126 @@ class OpenAiApi {
     }
 
 
-    /**
-     * Batch translate and merge: sends multiple ASR segments to AI for smart translation.
-     * AI merges split sentences, discards hallucinations, and returns clean bilingual pairs.
-     */
+    /** Anthropic 协议端点(如 MiniMax /anthropic) 与 OpenAI 兼容端点(火山方舟 等) 自适应 */
+    private fun isAnthropicProtocol(baseUrl: String) = baseUrl.contains("anthropic")
 
-
-    suspend fun batchTranslateAndMerge(
-        baseUrl: String,
-        apiKey: String,
-        model: String,
-        segments: List<String>
-    ): List<Pair<String, String>> = withContext(Dispatchers.IO) {
-        val segmentsText = segments.mapIndexed { i, s -> "${i+1}. $s" }.joinToString("\n")
-        val prompt = "You are a professional interpreter. Receive numbered ASR segments from an English lecture. " +
-            "Tasks: 1) Translate to Chinese 2) Merge consecutive incomplete sentences 3) Discard hallucinated segments " +
-            "(random words like 'yeah','okay','think' alone without context) 4) Return ONLY a JSON array of [english,chinese] pairs."
-
-        val payload = JSONObject().apply {
-            put("model", model)
-            put("messages", JSONArray().apply {
-                put(JSONObject().apply { put("role", "system"); put("content", prompt) })
-                put(JSONObject().apply { put("role", "user"); put("content", segmentsText) })
-            })
-            put("max_tokens", 4000)
-            put("temperature", 0.1)
-        }
-
-        val request = Request.Builder()
-            .url("$baseUrl/chat/completions")
-            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0")
-            .addHeader("Authorization", "Bearer $apiKey")
-            .addHeader("Content-Type", "application/json")
-            .post(payload.toString().toRequestBody("application/json".toMediaType()))
-            .build()
-
-        val response = client.newCall(request).execute()
-        val body = response.body?.string() ?: throw Exception("Empty response")
-        if (!response.isSuccessful) throw Exception("Batch API error ${response.code}: $body")
-
+    private fun cloudTextFromResponse(body: String, anthropic: Boolean): String {
         val json = JSONObject(body)
-        val content = json.getJSONArray("choices")
-            .getJSONObject(0)
-            .getJSONObject("message")
-            .getString("content")
-
-        try {
-            val jsonStr = content.let {
-                val start = it.indexOf('[')
-                val end = it.lastIndexOf(']')
-                if (start >= 0 && end > start) it.substring(start, end + 1) else it
+        return if (anthropic) {
+            val contentArr = json.getJSONArray("content")
+            val sb = StringBuilder()
+            for (i in 0 until contentArr.length()) {
+                val c = contentArr.getJSONObject(i)
+                if (c.optString("type") == "text") sb.append(c.getString("text"))
             }
-            val arr = org.json.JSONArray(jsonStr)
-            val results = mutableListOf<Pair<String, String>>()
-            for (i in 0 until arr.length()) {
-                // 兼容 ["en","zh"] 数组和 {"english":"...","chinese":"..."} 对象两种格式
-                val pair = arr.optJSONArray(i)
-                if (pair != null && pair.length() >= 2) {
-                    results.add(Pair(pair.getString(0), pair.getString(1)))
-                } else {
-                    val obj = arr.optJSONObject(i)
-                    if (obj != null) {
-                        val en = obj.optString("english").ifEmpty { obj.optString("en") }
-                        val zh = obj.optString("chinese").ifEmpty { obj.optString("zh") }
-                        if (en.isNotBlank() && zh.isNotBlank()) results.add(Pair(en, zh))
-                    }
-                }
-            }
-            results.ifEmpty { segments.map { Pair(it, "[无翻译]") } }
-        } catch (e: Exception) {
-            Log.e("OpenAiApi", "Batch parse error: " + e.message + " raw: " + content.take(200))
-            segments.map { Pair(it, "[解析失败]") }
+            sb.toString()
+        } else {
+            json.getJSONArray("choices")
+                .getJSONObject(0)
+                .getJSONObject("message")
+                .getString("content")
         }
     }
 
     /**
-     * Batch translate via cloud MiniMax-M3 (Anthropic-compatible protocol).
-     * Used for the "cloud override" path: local translation shows first (fast),
-     * cloud translation arrives later and REPLACES (覆盖) the local one.
-     *
-     * Unlike batchTranslateAndMerge() which used OpenAI-compatible protocol,
-     * MiniMax-M3 is reached via Anthropic Messages API at api.minimaxi.com/anthropic
-     * with X-Api-Key header (not Authorization Bearer).
-     *
-     * Caller passes cloudBaseUrl/ApiKey/Model from settings (defaults injected
-     * from BuildConfig.MINIMAX_* so user can install APK with zero config).
-     *
-     * Verified 2026-09-22: M3 batch translate returns clean JSON array of
-     * [english,chinese] pairs in ~1.2-2s for 3-5 segments.
+     * 云端单轮对话（协议自适应）—— 课堂总结生成用。
+     * 默认云端 = 火山方舟 Agent Plan (OpenAI 兼容: POST {baseUrl}/chat/completions);
+     * baseUrl 含 "anthropic" 时走 Anthropic Messages 协议 (MiniMax 等)。
      */
-    suspend fun batchTranslateAndMergeCloud(
-        cloudBaseUrl: String,
-        cloudApiKey: String,
-        cloudModel: String,
-        segments: List<String>
-    ): List<Pair<String, String>> = withContext(Dispatchers.IO) {
-        val apiKey = cloudApiKey
-        val baseUrl = cloudBaseUrl
-        val model = cloudModel
+    suspend fun cloudChat(
+        baseUrl: String,
+        apiKey: String,
+        model: String,
+        system: String,
+        user: String,
+        maxTokens: Int = 3000,
+        temperature: Double = 0.3,
+        reasoningEffort: String? = null
+    ): String = withContext(Dispatchers.IO) {
+        val anthropic = isAnthropicProtocol(baseUrl)
+        val url = if (anthropic) "$baseUrl/v1/messages" else "$baseUrl/chat/completions"
+        val payload = if (anthropic) {
+            JSONObject().apply {
+                put("model", model)
+                put("max_tokens", maxTokens)
+                put("system", system)
+                put("messages", JSONArray().apply {
+                    put(JSONObject().apply { put("role", "user"); put("content", user) })
+                })
+            }
+        } else {
+            JSONObject().apply {
+                put("model", model)
+                put("messages", JSONArray().apply {
+                    put(JSONObject().apply { put("role", "system"); put("content", system) })
+                    put(JSONObject().apply { put("role", "user"); put("content", user) })
+                })
+                put("max_tokens", maxTokens)
+                put("temperature", temperature)
+                // 思考深度（火山方舟官方字段，底层同名参数）：
+                // deepseek-v4 家族支持 none/minimal/low/high/max；默认 high。
+                // 2026-09-26 实测：none→思考量精确归零（0 tok）证明通道生效；max→思考量最高（592 tok vs 默认230）。
+                if (!reasoningEffort.isNullOrBlank()) put("reasoning_effort", reasoningEffort)
+            }
+        }
+        val builder = Request.Builder()
+            .url(url)
+            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0")
+            .addHeader("Content-Type", "application/json")
+        if (anthropic) {
+            builder.addHeader("X-Api-Key", apiKey)  // Anthropic protocol uses X-Api-Key, not Bearer
+            builder.addHeader("anthropic-version", "2023-06-01")
+        } else {
+            builder.addHeader("Authorization", "Bearer $apiKey")
+        }
+        val request = builder.post(payload.toString().toRequestBody("application/json".toMediaType())).build()
 
-        val segmentsText = segments.mapIndexed { i, s -> "${i+1}. $s" }.joinToString("\n")
+        val response = client.newCall(request).execute()
+        val body = response.body?.string() ?: throw Exception("Empty cloud response")
+        if (!response.isSuccessful) throw Exception("Cloud API error ${response.code}: ${body.take(300)}")
+        // usage 记录（含 reasoning_tokens，验证思考深度是否生效；可在 logcat 查看）
+        try {
+            val u = JSONObject(body).optJSONObject("usage")
+            if (u != null) {
+                val rt = u.optJSONObject("completion_tokens_details")?.optInt("reasoning_tokens", -1) ?: -1
+                Log.i("OpenAiApi", "cloudChat[$model] prompt=${u.optInt("prompt_tokens", -1)} completion=${u.optInt("completion_tokens", -1)} reasoning_tokens=$rt")
+            }
+        } catch (_: Exception) {}
+        stripThinking(cloudTextFromResponse(body, anthropic))
+    }
+
+    /**
+     * 云端批量翻译 —— 严格 1:1（逐条独立翻译，不合并、不丢弃、不重排），协议自适应。
+     * 调用方按位置把第 i 对替换到第 i 条本地译文上（云端覆盖 / 整课重译"润色"）。
+     * 2026-09-26 由 batchTranslateAndMergeCloud 演进：默认云端从 MiniMax(Anthropic)
+     * 切到火山方舟 Agent Plan(OpenAI 兼容) 后，同一函数兼容两种协议。
+     */
+    suspend fun cloudBatchTranslate(
+        baseUrl: String,
+        apiKey: String,
+        model: String,
+        segments: List<String>
+    ): List<Pair<String, String>> {
+        if (segments.isEmpty()) return emptyList()
+        val segmentsText = segments.mapIndexed { i, s -> "${i + 1}. $s" }.joinToString("\n")
         // 严格 1:1: 调用方按位置把第 i 对覆盖到第 i 条本地译文上, 合并/丢弃会错位
         // (2026-09-22 实测: 允许合并时 3 段只回 1 对, 只覆盖 1/3 —— 改为逐条直译)
         val prompt = "You are a professional interpreter. Receive exactly " + segments.size + " numbered ASR segments. " +
             "Translate EACH segment to Chinese independently. " +
             "Return ONLY a JSON array with EXACTLY " + segments.size + " [english,chinese] pairs, " +
             "same order and count as the input segments. Do NOT merge, do NOT drop, do NOT reorder."
+        val content = cloudChat(
+            baseUrl = baseUrl, apiKey = apiKey, model = model,
+            system = prompt, user = segmentsText,
+            maxTokens = maxOf(1500, segments.size * 220), temperature = 0.1
+        )
+        return parsePairs(content, segments)
+    }
 
-        // Anthropic Messages API format
-        val payload = JSONObject().apply {
-            put("model", model)
-            put("max_tokens", 4000)
-            put("system", prompt)
-            put("messages", JSONArray().apply {
-                put(JSONObject().apply { put("role", "user"); put("content", segmentsText) })
-            })
-        }
-
-        val request = Request.Builder()
-            .url("$baseUrl/v1/messages")
-            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0")
-            .addHeader("X-Api-Key", apiKey)  // Anthropic protocol uses X-Api-Key, not Bearer
-            .addHeader("anthropic-version", "2023-06-01")
-            .addHeader("Content-Type", "application/json")
-            .post(payload.toString().toRequestBody("application/json".toMediaType()))
-            .build()
-
-        val response = client.newCall(request).execute()
-        val body = response.body?.string() ?: throw Exception("Empty cloud response")
-        if (!response.isSuccessful) throw Exception("Cloud API error ${response.code}: $body")
-
-        // Anthropic response: {"content":[{"type":"text","text":"..."}], ...}
-        val json = JSONObject(body)
-        val contentArr = json.getJSONArray("content")
-        val content = StringBuilder()
-        for (i in 0 until contentArr.length()) {
-            val c = contentArr.getJSONObject(i)
-            if (c.optString("type") == "text") content.append(c.getString("text"))
-        }
-        var text = content.toString()
-        // 剥 M3 思考块泄漏 + markdown 代码围栏 (解析失败 6/32 批的常见来源)
-        text = text.replace(Regex("(?s).*?"), "").replace(Regex("```(?:json)?"), "")
-
-        try {
+    private fun parsePairs(text0: String, fallback: List<String>): List<Pair<String, String>> {
+        // 剥思考块泄漏 + markdown 代码围栏 (解析失败 6/32 批的常见来源)
+        val text = text0.replace(Regex("(?s).*?</think>"), "").replace(Regex("```(?:json)?"), "")
+        return try {
             val jsonStr = text.let {
                 val start = it.indexOf('[')
                 val end = it.lastIndexOf(']')
@@ -336,11 +313,10 @@ class OpenAiApi {
                     }
                 }
             }
-            results.ifEmpty { segments.map { Pair(it, "[无翻译]") } }
+            results.ifEmpty { fallback.map { Pair(it, "[无翻译]") } }
         } catch (e: Exception) {
-            Log.e("OpenAiApi", "Cloud batch parse error: ${e.message} raw: ${text.take(300)}")
-            segments.map { Pair(it, "[解析失败]") }
+            Log.e("OpenAiApi", "Batch parse error: " + e.message + " raw: " + text.take(200))
+            fallback.map { Pair(it, "[解析失败]") }
         }
     }
-
 }

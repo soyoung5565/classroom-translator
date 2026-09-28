@@ -35,7 +35,9 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.rounded.AudioFile
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.HistoryEdu
 import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material.icons.outlined.MenuBook
@@ -47,6 +49,7 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -61,6 +64,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -91,10 +95,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.classroom.translator.data.SessionManager
+import com.classroom.translator.data.ClassSummary
 import com.classroom.translator.data.TranslationSession
+import com.classroom.translator.ui.TranslatorViewModel
 import com.classroom.translator.ui.theme.AppTheme
 import com.classroom.translator.ui.theme.AppTokens
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -110,6 +117,7 @@ import kotlin.math.roundToInt
  *   appbar(compact 20px) + 搜索条(46dp 胶囊) + 分组标签/会话卡(44 图标+日期+时长+chips+chevron)
  *   空状态：渐变圆角 orb + 文案 + 「开始第一课」
  *   详情：返回+标题+分享/下载 → 播放条(播放/暂停/停止+进度) → 双语卡片流(ZH 徽标内联)
+ *        2026-09-26 新增：详情页首卡「AI 课堂总结」（生成/重新生成/云端润色/时间区间跳转回放）
  */
 
 // ---------------------------------------------------------------------------
@@ -694,12 +702,20 @@ private fun EmptyHistory(onNavigateToRecording: () -> Unit) {
 fun SessionDetailScreen(
     sessionId: Long,
     onBack: () -> Unit,
+    viewModel: TranslatorViewModel,
 ) {
     val context = LocalContext.current
     val cs = MaterialTheme.colorScheme
     val tk = AppTheme.tokens
     val sessionManager = remember { SessionManager(context) }
     var session by remember { mutableStateOf<TranslationSession?>(null) }
+    val scope = rememberCoroutineScope()
+
+    // —— AI 课堂总结 / 云端润色 状态 ——
+    var generating by remember { mutableStateOf(false) }
+    var polishing by remember { mutableStateOf(false) }
+    var aiStatus by remember { mutableStateOf("") }
+    var pendingSeekSec by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(sessionId) {
         session = sessionManager.loadSessions().find { it.id == sessionId }
@@ -721,6 +737,36 @@ fun SessionDetailScreen(
                 )
                 return@Box
             }
+            val classSum = remember(s.classSummary) { ClassSummary.fromJson(s.classSummary) }
+
+            val onGenerate: () -> Unit = {
+                if (!generating && !polishing) {
+                    scope.launch {
+                        generating = true
+                        aiStatus = ""
+                        val r = viewModel.generateSummary(s) { aiStatus = it }
+                        r.onSuccess { sum ->
+                            session = s.copy(classSummary = sum.toJson())
+                            aiStatus = ""
+                        }
+                        r.onFailure { e -> aiStatus = "失败：${e.message ?: "未知错误"}" }
+                        generating = false
+                    }
+                }
+            }
+            val onPolish: () -> Unit = {
+                if (!generating && !polishing) {
+                    scope.launch {
+                        polishing = true
+                        aiStatus = ""
+                        val r = viewModel.polishSessionCloud(s) { aiStatus = it }
+                        r.onSuccess { updated -> session = updated; aiStatus = "" }
+                        r.onFailure { e -> aiStatus = "失败：${e.message ?: "未知错误"}" }
+                        polishing = false
+                    }
+                }
+            }
+
             Column(Modifier.fillMaxSize()) {
                 DetailAppBar(
                     title = "${fmtMonthDay(s.date)} $DEFAULT_SUBJECT",
@@ -731,9 +777,28 @@ fun SessionDetailScreen(
                     } else null,
                 )
                 if (s.audioPath.isNotBlank()) {
-                    PlayerRow(audioPath = s.audioPath)
+                    PlayerRow(
+                        audioPath = s.audioPath,
+                        pendingSeekSec = pendingSeekSec,
+                        onSeekHandled = { pendingSeekSec = null },
+                    )
                 }
-                PairList(session = s)
+                PairList(
+                    session = s,
+                    header = {
+                        SummaryBlock(
+                            summary = classSum,
+                            hasAudio = s.audioPath.isNotBlank(),
+                            polished = s.polished,
+                            generating = generating,
+                            polishing = polishing,
+                            status = aiStatus,
+                            onGenerate = onGenerate,
+                            onPolish = onPolish,
+                            onSeek = { sec -> pendingSeekSec = sec },
+                        )
+                    },
+                )
             }
         }
     }
@@ -793,7 +858,11 @@ private fun DetailAppBar(
 }
 
 @Composable
-private fun PlayerRow(audioPath: String) {
+private fun PlayerRow(
+    audioPath: String,
+    pendingSeekSec: Int?,
+    onSeekHandled: () -> Unit,
+) {
     val cs = MaterialTheme.colorScheme
     val tk = AppTheme.tokens
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
@@ -834,8 +903,31 @@ private fun PlayerRow(audioPath: String) {
         }
     }
 
+    // （修复）停止后 player 释放为 null —— 重新懒加载，保证"停止后再点播放/跳转"仍可用
+    fun ensurePlayer(): MediaPlayer? {
+        player?.let { return it }
+        return try {
+            val mp = MediaPlayer().apply {
+                setDataSource(audioPath)
+                prepare()
+                seekTo(0)
+            }
+            mp.setOnCompletionListener {
+                isPlaying = false
+                positionMs = 0L
+                mp.seekTo(0)
+            }
+            player = mp
+            durationMs = mp.duration.toLong()
+            mp
+        } catch (e: Exception) {
+            android.util.Log.e("Detail", "prepare failed", e)
+            null
+        }
+    }
+
     fun start() {
-        val p = player ?: return
+        val p = ensurePlayer() ?: return
         try {
             if (p.currentPosition >= p.duration - 50) p.seekTo(0)
             p.start()
@@ -845,6 +937,26 @@ private fun PlayerRow(audioPath: String) {
         }
     }
 
+    // 跳转到指定秒（课堂总结条目 → 时间胶囊 → 回放定位）
+    fun seekToSec(sec: Int) {
+        val p = ensurePlayer() ?: return
+        try {
+            p.seekTo(sec * 1000)
+            positionMs = (sec * 1000).toLong()
+            if (!p.isPlaying) {
+                p.start()
+                isPlaying = true
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("Detail", "seek failed", e)
+        }
+    }
+
+    LaunchedEffect(pendingSeekSec) {
+        val sec = pendingSeekSec ?: return@LaunchedEffect
+        seekToSec(sec)
+        onSeekHandled()
+    }
 
     Row(
         modifier = Modifier
@@ -966,13 +1078,361 @@ private fun PlayerRow(audioPath: String) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// AI 课堂总结卡（详情页首卡，2026-09-26）—— 生成 / 重新生成 / 云端润色 /
+// 重点与知识点带"录音时间区间"胶囊（点击跳转回放）。
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun SummaryBlock(
+    summary: ClassSummary?,
+    hasAudio: Boolean,
+    polished: Boolean,
+    generating: Boolean,
+    polishing: Boolean,
+    status: String,
+    onGenerate: () -> Unit,
+    onPolish: () -> Unit,
+    onSeek: (Int) -> Unit,
+) {
+    val cs = MaterialTheme.colorScheme
+    val tk = AppTheme.tokens
+    val shape = RoundedCornerShape(12.dp)
+    val busy = generating || polishing
+    var expandedAnswers by remember { mutableStateOf(setOf<Int>()) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(2.dp, shape)
+            .clip(shape)
+            .background(cs.surfaceContainerLow)
+            .border(1.dp, tk.hairline, shape)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .gradientFill(RoundedCornerShape(8.dp), listOf(tk.gradA, tk.gradB)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = cs.onPrimary, modifier = Modifier.size(15.dp))
+            }
+            Spacer(Modifier.width(8.dp))
+            Text("课堂总结", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = cs.onSurface)
+            Spacer(Modifier.weight(1f))
+            if (summary != null && summary.model.isNotBlank()) {
+                Text("AI · ${summary.model.take(20)}", fontSize = 10.sp, color = cs.onSurfaceVariant.copy(alpha = 0.8f))
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+
+        when {
+            busy -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = cs.primary, strokeWidth = 2.dp)
+                    Spacer(Modifier.width(9.dp))
+                    Text(
+                        status.ifBlank { if (generating) "正在生成课堂总结…" else "云端整课重译中…" },
+                        fontSize = 12.sp,
+                        color = cs.onSurfaceVariant,
+                    )
+                }
+            }
+            summary == null -> {
+                Text(
+                    "把整节课交给 AI：归纳重点 · 讲解知识点 · 出复习自测，并标出对应录音时间。",
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    color = cs.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(50))
+                            .clickable(enabled = !polishing, onClick = onGenerate)
+                            .gradientFill(RoundedCornerShape(50), listOf(tk.gradA, tk.gradB))
+                            .padding(horizontal = 15.dp),
+                    ) {
+                        Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = cs.onPrimary, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("生成课堂总结", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = cs.onPrimary)
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .height(34.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(cs.secondaryContainer)
+                            .border(1.dp, cs.primary.copy(alpha = 0.35f), RoundedCornerShape(50))
+                            .clickable(enabled = !generating, onClick = onPolish)
+                            .padding(horizontal = 15.dp),
+                    ) {
+                        Text(
+                            if (polished) "重新润色" else "云端润色",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = cs.onSecondaryContainer,
+                        )
+                    }
+                }
+                if (polished) {
+                    Spacer(Modifier.height(7.dp))
+                    Text("✓ 译文已云端整课重译（术语更一致）", fontSize = 10.sp, color = cs.primary)
+                }
+            }
+            else -> {
+                if (summary.overview.isNotBlank()) {
+                    Text(summary.overview, fontSize = 13.sp, lineHeight = 19.sp, color = cs.onSurface)
+                    Spacer(Modifier.height(10.dp))
+                }
+
+                if (summary.points.isNotEmpty()) {
+                    SummarySectionHeader("重点内容")
+                    summary.points.forEachIndexed { idx, p ->
+                        Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(16.dp)
+                                        .clip(CircleShape)
+                                        .background(cs.primaryContainer),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text("${idx + 1}", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = cs.onPrimaryContainer)
+                                }
+                                Spacer(Modifier.width(7.dp))
+                                Text(p.title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = cs.onSurface)
+                                Spacer(Modifier.weight(1f))
+                                if (p.startSec >= 0) {
+                                    Spacer(Modifier.width(8.dp))
+                                    TimeChip(p.startSec, p.endSec, seekable = hasAudio, onSeek = onSeek)
+                                }
+                            }
+                            Spacer(Modifier.height(3.dp))
+                            Text(p.detail, fontSize = 12.sp, lineHeight = 17.sp, color = cs.onSurfaceVariant, modifier = Modifier.padding(start = 23.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                if (summary.explainers.isNotEmpty()) {
+                    SummarySectionHeader("知识点讲解")
+                    summary.explainers.forEach { ex ->
+                        Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                KindChip(ex.kind)
+                                Spacer(Modifier.width(6.dp))
+                                Text(ex.term, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = cs.onSurface)
+                                Spacer(Modifier.weight(1f))
+                                if (ex.startSec >= 0) {
+                                    TimeChip(ex.startSec, ex.endSec, seekable = hasAudio, onSeek = onSeek)
+                                }
+                            }
+                            Spacer(Modifier.height(3.dp))
+                            Text(ex.explanation, fontSize = 12.sp, lineHeight = 17.sp, color = cs.onSurfaceVariant)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                if (summary.homework.isNotEmpty()) {
+                    SummarySectionHeader("课后作业")
+                    summary.homework.forEach { h ->
+                        Row(Modifier.padding(vertical = 2.dp)) {
+                            Text("·", fontSize = 12.sp, color = cs.primary, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(6.dp))
+                            Text(h, fontSize = 12.sp, lineHeight = 17.sp, color = cs.onSurface)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                if (summary.questions.isNotEmpty()) {
+                    SummarySectionHeader("复习自测（点击看答案）")
+                    summary.questions.forEachIndexed { idx, qa ->
+                        val open = idx in expandedAnswers
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(cs.surfaceContainer.copy(alpha = 0.7f))
+                                .clickable {
+                                    expandedAnswers = if (open) expandedAnswers - idx else expandedAnswers + idx
+                                }
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("Q${idx + 1}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = cs.primary)
+                                Spacer(Modifier.width(6.dp))
+                                Text(qa.q, fontSize = 12.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium, color = cs.onSurface, modifier = Modifier.weight(1f))
+                                if (qa.startSec >= 0) {
+                                    Spacer(Modifier.width(6.dp))
+                                    TimeChip(qa.startSec, -1, seekable = hasAudio, onSeek = onSeek)
+                                }
+                            }
+                            if (open) {
+                                Spacer(Modifier.height(5.dp))
+                                Text(qa.a, fontSize = 12.sp, lineHeight = 17.sp, color = cs.onSurfaceVariant)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                if (summary.keywords.isNotEmpty()) {
+                    SummarySectionHeader("关键词")
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        summary.keywords.chunked(4).forEach { rowItems ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                rowItems.forEach { kw ->
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(50))
+                                            .background(cs.tertiaryContainer)
+                                            .padding(horizontal = 9.dp, vertical = 3.dp),
+                                    ) {
+                                        Text(kw, fontSize = 11.sp, color = cs.onTertiaryContainer, fontWeight = FontWeight.Medium)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (polished) {
+                        Text("✓ 已云端润色", fontSize = 10.sp, color = cs.primary)
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(cs.secondaryContainer)
+                                .border(1.dp, cs.primary.copy(alpha = 0.35f), RoundedCornerShape(50))
+                                .clickable(onClick = onPolish)
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
+                        ) {
+                            Text("云端润色", fontSize = 11.sp, color = cs.onSecondaryContainer)
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .clickable(onClick = onGenerate)
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    ) {
+                        Icon(Icons.Outlined.Refresh, contentDescription = null, tint = cs.onSurfaceVariant, modifier = Modifier.size(13.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("重新生成", fontSize = 11.sp, color = cs.onSurfaceVariant)
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                Text("由 AI 生成，仅供参考 · 重要内容可点时间戳回听核对", fontSize = 10.sp, color = cs.onSurfaceVariant.copy(alpha = 0.7f))
+            }
+        }
+
+        if (!busy && status.isNotBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(status, fontSize = 11.sp, color = cs.error, lineHeight = 16.sp)
+        }
+    }
+}
+
+@Composable
+private fun SummarySectionHeader(title: String) {
+    val cs = MaterialTheme.colorScheme
+    val tk = AppTheme.tokens
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
+        Box(
+            Modifier
+                .width(3.dp)
+                .height(12.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .gradientFill(RoundedCornerShape(2.dp), listOf(tk.gradA, tk.gradB)),
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = cs.onSurface)
+    }
+}
+
+@Composable
+private fun KindChip(kind: String) {
+    val cs = MaterialTheme.colorScheme
+    val label = when (kind.lowercase()) {
+        "vocab" -> "词汇"
+        "grammar" -> "语法"
+        "concept" -> "概念"
+        else -> "术语"
+    }
+    val bg: Color
+    val fg: Color
+    when (kind.lowercase()) {
+        "vocab" -> { bg = cs.tertiaryContainer; fg = cs.onTertiaryContainer }
+        "grammar" -> { bg = cs.primaryContainer; fg = cs.onPrimaryContainer }
+        else -> { bg = cs.secondaryContainer; fg = cs.onSecondaryContainer }
+    }
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(bg)
+            .padding(horizontal = 7.dp, vertical = 2.dp),
+    ) {
+        Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = fg)
+    }
+}
+
+/** 录音时间区间小胶囊：有音频时点击跳转回放（无音频/无偏移则仅展示）。 */
+@Composable
+private fun TimeChip(startSec: Int, endSec: Int, seekable: Boolean, onSeek: (Int) -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    val label = if (endSec > startSec && startSec >= 0) {
+        "${fmtOff(startSec)}–${fmtOff(endSec)}"
+    } else fmtOff(startSec)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(cs.primaryContainer.copy(alpha = if (seekable) 0.75f else 0.45f))
+            .clickable(enabled = seekable) { onSeek(startSec) }
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Icon(
+            Icons.Rounded.PlayArrow,
+            contentDescription = if (seekable) "跳转回放" else null,
+            tint = cs.onPrimaryContainer,
+            modifier = Modifier.size(12.dp),
+        )
+        Spacer(Modifier.width(3.dp))
+        Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = cs.onPrimaryContainer)
+    }
+}
+
+private fun fmtOff(sec: Int): String {
+    if (sec < 0) return "--:--"
+    val h = sec / 3600
+    val m = (sec % 3600) / 60
+    val s = sec % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+}
+
 private fun fmtMs(ms: Long): String {
     val total = (ms / 1000).toInt()
     return fmtDur(total)
 }
 
 @Composable
-private fun PairList(session: TranslationSession) {
+private fun PairList(
+    session: TranslationSession,
+    header: (@Composable () -> Unit)? = null,
+) {
     val cs = MaterialTheme.colorScheme
     val tk = AppTheme.tokens
     LazyColumn(
@@ -982,6 +1442,9 @@ private fun PairList(session: TranslationSession) {
         verticalArrangement = Arrangement.spacedBy(10.dp),
         contentPadding = PaddingValues(top = 4.dp, bottom = 16.dp),
     ) {
+        if (header != null) {
+            item(key = "ai-summary") { header() }
+        }
         items(session.entries, key = { it.timestamp + it.chinese.hashCode() }) { e ->
             PairCard(
                 ts = e.timestamp.take(5),

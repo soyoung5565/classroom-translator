@@ -62,9 +62,11 @@ fun MainNavHost() {
                     val out = ArrayList<com.classroom.translator.data.TranslationEntryData>()
                     for (i in 0 until n) {
                         val tt = startSec + if (n > 1) spanSec * i / (n - 1) else 0
+                        val off = if (n > 1) spanSec * i / (n - 1) else 0
+                        val offEnd = if (n > 1) spanSec * (i + 1) / (n - 1) else spanSec
                         val ts = "%02d:%02d:%02d".format(tt / 3600, (tt % 3600) / 60, tt % 60)
                         val seed = detailSeeds[i % detailSeeds.size]
-                        out.add(com.classroom.translator.data.TranslationEntryData(timestamp = ts, english = seed.first, chinese = seed.second))
+                        out.add(com.classroom.translator.data.TranslationEntryData(timestamp = ts, english = seed.first, chinese = seed.second, startSec = off, endSec = offEnd))
                     }
                     return out
                 }
@@ -73,7 +75,9 @@ fun MainNavHost() {
                 val today = df.format(cal.time)
                 cal.add(java.util.Calendar.DAY_OF_YEAR, -2); val d2 = df.format(cal.time)
                 cal.add(java.util.Calendar.DAY_OF_YEAR, -1); val d3 = df.format(cal.time)
-                val audio = java.io.File(ctx.getExternalFilesDir(null), "recordings/demo_lesson.wav").absolutePath
+                val audioFile = java.io.File(ctx.getExternalFilesDir(null), "recordings/demo_lesson.wav")
+                if (!audioFile.exists()) writeDemoWav(audioFile, 2600)
+                val audio = audioFile.absolutePath
                 sm.saveSession(com.classroom.translator.data.TranslationSession(id = 9001L, date = today, startTime = "14:05", endTime = "14:47", entries = mkEntries(128, 12 * 3600 + 18 * 60, 42 * 60 + 17), audioPath = audio))
                 sm.saveSession(com.classroom.translator.data.TranslationSession(id = 9002L, date = today, startTime = "12:18", endTime = "12:56", entries = mkEntries(96, 14 * 3600 + 5 * 60, 38 * 60 + 5)))
                 sm.saveSession(com.classroom.translator.data.TranslationSession(id = 9003L, date = d2, startTime = "09:12", endTime = "09:58", entries = mkEntries(141, 9 * 3600 + 12 * 60, 45 * 60 + 32)))
@@ -110,7 +114,8 @@ fun MainNavHost() {
             val sessionId = backStackEntry.arguments?.getLong("sessionId") ?: 0L
             SessionDetailScreen(
                 sessionId = sessionId,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                viewModel = sharedViewModel,
             )
         }
         composable("whole_session") {
@@ -124,5 +129,48 @@ fun MainNavHost() {
                 viewModel = sharedViewModel
             )
         }
+    }
+}
+
+// [debug-only] 生成演示 WAV：8kHz/16bit/单声道，每 30 秒一个短提示音。
+// 用于验证「课堂总结 → 时间区间 → 跳转回放」链路（--ez seed_history true 时调用）。
+private fun writeDemoWav(file: java.io.File, seconds: Int) {
+    try {
+        if (file.exists() && file.length() > 44) return
+        file.parentFile?.mkdirs()
+        val sampleRate = 8000
+        val total = sampleRate * seconds
+        val out = java.io.BufferedOutputStream(file.outputStream(), 1 shl 16)
+        fun le32(v: Int) = byteArrayOf((v and 0xff).toByte(), ((v shr 8) and 0xff).toByte(), ((v shr 16) and 0xff).toByte(), ((v shr 24) and 0xff).toByte())
+        fun le16(v: Int) = byteArrayOf((v and 0xff).toByte(), ((v shr 8) and 0xff).toByte())
+        val dataLen = total * 2
+        out.write("RIFF".toByteArray())
+        out.write(le32(36 + dataLen))
+        out.write("WAVE".toByteArray())
+        out.write("fmt ".toByteArray())
+        out.write(le32(16))
+        out.write(le16(1))
+        out.write(le16(1))
+        out.write(le32(sampleRate))
+        out.write(le32(sampleRate * 2))
+        out.write(le16(2))
+        out.write(le16(16))
+        out.write("data".toByteArray())
+        out.write(le32(dataLen))
+        val buf = ByteArray(total * 2)
+        var idx = 0
+        for (t in 0 until total) {
+            val posInStep = t % (30 * sampleRate)
+            val v = if (posInStep < sampleRate / 3) {
+                (Math.sin(2.0 * Math.PI * 880.0 * t / sampleRate) * 8000).toInt()
+            } else 0
+            buf[idx++] = (v and 0xff).toByte()
+            buf[idx++] = ((v shr 8) and 0xff).toByte()
+        }
+        out.write(buf)
+        out.close()
+        android.util.Log.i("Seed", "demo wav written: ${file.length()} bytes, ${seconds}s")
+    } catch (e: Exception) {
+        android.util.Log.e("Seed", "demo wav failed", e)
     }
 }

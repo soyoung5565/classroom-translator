@@ -27,10 +27,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
@@ -48,6 +53,9 @@ import androidx.compose.ui.unit.sp
 import com.classroom.translator.ui.theme.AppTheme
 import com.classroom.translator.ui.theme.AppTokens
 import com.classroom.translator.ui.TranslatorViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * 设置页 —— 设计稿（screen-settings.html）视觉语言重建：
@@ -57,8 +65,11 @@ import com.classroom.translator.ui.TranslatorViewModel
  *
  * 与原设计的差异（已单独向用户说明）：
  *   - 「课堂 / 讲座 / 在线会议」快速预设排：应要求移除；
- *   - 演示用开关（实时转写 / 云端机器翻译 / 课后整课润色）无对应真实功能，未实现；
+ *   - 设计稿的演示开关未做成"假开关"：实时转写=App 的实际工作方式；云端机器翻译=自动云端
+ *     覆盖（每 3 条）；课后整课润色=详情页「云端润色」按钮 + 会话结束自动执行（2026-09-26 落实）；
  *   - 控件全部映射到真实配置项（ASR 语种 / 各服务地址与密钥 / 翻译模型档位）。
+ *   - 2026-09-26：模型档位改为"整套预设"（接口地址+模型+密钥一起切）——此前只改模型名字段，
+ *     本地端点忽略模型名 → 实际不生效（假控件已修复）。
  */
 @Composable
 fun SettingsScreen(
@@ -128,20 +139,20 @@ fun SettingsScreen(
 
                     Spacer(Modifier.height(0.dp))
                     // ── 云端翻译 ─────────────────────────────
-                    GroupHeader(icon = Icons.Outlined.CloudDone, title = "云端翻译", code = "CLOUD")
-                    ItemCard(name = "接口地址", desc = "默认值由 BuildConfig 注入，无需填写即可使用") {
+                    GroupHeader(icon = Icons.Outlined.CloudDone, title = "云端大模型", code = "CLOUD")
+                    ItemCard(name = "接口地址", desc = "默认火山方舟（OpenAI 兼容），无需修改即可用；也可填 MiniMax /anthropic 等") {
                         FieldBox(
                             value = settings.cloudBaseUrl,
                             onChange = { v -> viewModel.updateSettings { s -> s.copy(cloudBaseUrl = v) } },
                         )
                     }
-                    ItemCard(name = "模型", desc = "云端机器翻译模型名") {
+                    ItemCard(name = "模型", desc = "云端模型名（默认 deepseek-v4-1-flash）") {
                         FieldBox(
                             value = settings.cloudModel,
                             onChange = { v -> viewModel.updateSettings { s -> s.copy(cloudModel = v) } },
                         )
                     }
-                    ItemCard(name = "密钥", desc = "云端服务凭证") {
+                    ItemCard(name = "密钥", desc = "云端服务凭证（默认已注入）") {
                         FieldBox(
                             value = settings.cloudApiKey,
                             onChange = { v -> viewModel.updateSettings { s -> s.copy(cloudApiKey = v) } },
@@ -152,12 +163,22 @@ fun SettingsScreen(
                     Spacer(Modifier.height(0.dp))
                     // ── 大模型翻译 ───────────────────────────
                     GroupHeader(icon = Icons.Outlined.AutoAwesome, title = "大模型翻译", code = "LLM")
-                    ItemCard(name = "模型档位", desc = "本地模型免费 · 云端模型按量计费") {
+                    ItemCard(name = "模型档位", desc = "整套切换：本地免费离线 / 火山方舟云端（地址与密钥随之更新）") {
                         SegWrap(
-                            options = ModelOptions,
-                            selected = settings.translateModel,
-                            onSelect = { id -> viewModel.updateSettings { s -> s.copy(translateModel = id) } },
-                            perRow = 3,
+                            options = ModelPresets.map { it.id to it.label },
+                            selected = presetOf(settings)?.id ?: "",
+                            onSelect = { id ->
+                                ModelPresets.firstOrNull { it.id == id }?.let { preset ->
+                                    viewModel.updateSettings { s ->
+                                        s.copy(
+                                            translateBaseUrl = preset.baseUrl,
+                                            translateModel = preset.model,
+                                            translateApiKey = preset.apiKey,
+                                        )
+                                    }
+                                }
+                            },
+                            perRow = 2,
                         )
                     }
                     ItemCard(name = "接口地址", desc = "兼容 OpenAI 协议的接口地址") {
@@ -186,13 +207,37 @@ private val LangOptions = listOf(
     "auto" to "自动",
 )
 
-private val ModelOptions = listOf(
-    "qwen3-1.7b" to "本地 Qwen3-1.7B",
-    "minimax-m3" to "MiniMax M3",
-    "kimi-k3" to "Kimi K3",
-    "glm-5.2" to "GLM 5.2",
-    "qwen3.8-max" to "Qwen3.8 Max",
+/**
+ * 模型档位 = 整套预设（接口地址 + 模型 + 密钥一起切换）——2026-09-26 修复：
+ * 此前只改 translateModel 单个字段，而本地端点会忽略模型名 → 单点切换等于假控件；
+ * 且原 5 个选项里 kimi/glm/qwen 等并无手机可达的接口。现只保留两条已实测通路。
+ */
+private data class ModelPreset(
+    val id: String,
+    val label: String,
+    val baseUrl: String,
+    val model: String,
+    val apiKey: String,
 )
+
+private val ModelPresets = listOf(
+    ModelPreset("local", "本地 Qwen3", "http://127.0.0.1:8002/v1", "qwen3", ""),
+    ModelPreset(
+        "volc", "火山 DeepSeek",
+        com.classroom.translator.BuildConfig.VOLC_BASE_URL,
+        com.classroom.translator.BuildConfig.VOLC_MODEL,
+        com.classroom.translator.BuildConfig.VOLC_API_KEY,
+    ),
+)
+
+private fun presetOf(settings: com.classroom.translator.data.AppSettings): ModelPreset? {
+    val url = settings.translateBaseUrl.trimEnd('/')
+    return ModelPresets.firstOrNull { p ->
+        val sameUrl = p.baseUrl.trimEnd('/') == url
+        val sameModel = if (p.id == "local") settings.translateModel.startsWith("qwen3") else settings.translateModel == p.model
+        sameUrl && sameModel
+    }
+}
 
 // ---------------------------------------------------------------------------
 
@@ -345,6 +390,28 @@ private fun FieldBox(
     val cs = MaterialTheme.colorScheme
     val tk = AppTheme.tokens
     val shape = RoundedCornerShape(8.dp)
+
+    // —— 受控输入防竞态（2026-09-26 修复）——
+    // 直连 DataStore 的异步回写会在快速输入时把光标/文本搅乱（实测快速输入会乱序拼接）。
+    // 方案：本地缓冲即时显示；600ms 防抖后提交；提交窗口内忽略外部回写（防自身旧值把新输入顶掉）。
+    var local by remember { mutableStateOf(value) }
+    var pending by remember { mutableStateOf(false) }
+    var commitJob by remember { mutableStateOf<Job?>(null) }
+    val scope = rememberCoroutineScope()
+
+    fun flush() {
+        commitJob?.cancel()
+        commitJob = null
+        if (pending) {
+            pending = false
+            onChange(local)
+        }
+    }
+    // 外部变更（如点"模型档位"预设整套切换）→ 无未提交编辑时同步显示
+    LaunchedEffect(value) {
+        if (!pending && value != local) local = value
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -356,15 +423,28 @@ private fun FieldBox(
         contentAlignment = Alignment.CenterStart,
     ) {
         BasicTextField(
-            value = value,
-            onValueChange = onChange,
+            value = local,
+            onValueChange = { v ->
+                local = v
+                pending = true
+                commitJob?.cancel()
+                commitJob = scope.launch {
+                    delay(600)
+                    if (pending) {
+                        pending = false
+                        onChange(local)
+                    }
+                }
+            },
             singleLine = true,
             textStyle = TextStyle(fontSize = 13.sp, color = cs.onSurface),
             cursorBrush = SolidColor(cs.primary),
             visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { st -> if (!st.isFocused) flush() },
             decorationBox = { inner ->
-                if (value.isEmpty()) {
+                if (local.isEmpty()) {
                     Text(
                         if (password) "未设置" else "默认（BuildConfig）",
                         fontSize = 12.sp,
