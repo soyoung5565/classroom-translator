@@ -8,6 +8,9 @@ local.properties
 app-debug.apk
 test.wav
 .env
+# 本地二进制依赖（不入库；获取方式见 README）
+app/libs/*.aar
+app/src/main/jniLibs/
 # 编译垃圾
 .kotlin/
 hs_err_*.log

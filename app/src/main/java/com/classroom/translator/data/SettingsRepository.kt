@@ -14,11 +14,11 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "se
 
 data class AppSettings(
     // ASR: 保留百炼 Fun-ASR Realtime (用户指定, minimax 套餐不含 ASR)
-    val asrApiKey: String = "REDACTED_KEY",
+    val asrApiKey: String = "",  // 默认留空：请在设置页填写你的 Key（请勿提交真实密钥）
     val asrBaseUrl: String = "http://127.0.0.1:8001/v1",  // polyglot-lion 默认端口; 切 Qwen3-ASR 时改 8000
     val asrModel: String = "polyglot-lion-1.7b",  // 默认混说最佳; 切 Qwen3-ASR 时改 "Qwen3-ASR"
     // LLM 翻译: 切到 minimax M3
-    val translateApiKey: String = "REDACTED_KEY",
+    val translateApiKey: String = "",  // 默认留空：请在设置页填写你的 Key（请勿提交真实密钥）
     val translateBaseUrl: String = "http://127.0.0.1:8002/v1",
     val translateModel: String = "qwen3-1.7b",
     // 云端翻译 (流式后覆盖 / 双端矫正): 默认值由 BuildConfig 注入 (M3 直连 minimaxi.com),
@@ -61,10 +61,10 @@ class SettingsRepository(private val context: Context) {
         val isOldTrans = rawTransKey.startsWith("tp-") || rawTransUrl.contains("xiaomimimo") || rawTransUrl.contains("token-plan") || (rawTransUrl.contains("minimaxi") && rawTransModel.lowercase().contains("mimo"))
 
         AppSettings(
-            asrApiKey = if (isOldAsr || rawAsrKey.isBlank()) "REDACTED_KEY" else rawAsrKey,
+            asrApiKey = if (isOldAsr || rawAsrKey.isBlank()) "" else rawAsrKey,
             asrBaseUrl = if (isOldAsr || rawAsrUrl.isBlank()) "http://127.0.0.1:8000/v1" else rawAsrUrl,
             asrModel = if (isOldAsr || rawAsrModel.isBlank()) "Qwen3-ASR" else rawAsrModel,
-            translateApiKey = if (isOldTrans || rawTransKey.isBlank()) "REDACTED_KEY" else rawTransKey,
+            translateApiKey = if (isOldTrans || rawTransKey.isBlank()) "" else rawTransKey,
             translateBaseUrl = if (isOldTrans || rawTransUrl.isBlank()) "http://127.0.0.1:8002/v1" else rawTransUrl,
             translateModel = if (isOldTrans || rawTransModel.isBlank()) "qwen3-1.7b" else rawTransModel,
             // 云端覆盖默认从 BuildConfig (编译注入),用户可改
@@ -88,10 +88,10 @@ class SettingsRepository(private val context: Context) {
     suspend fun update(block: (AppSettings) -> AppSettings) {
         context.dataStore.edit { prefs ->
             val current = AppSettings(
-                asrApiKey = prefs[ASR_API_KEY] ?: "REDACTED_KEY",
+                asrApiKey = prefs[ASR_API_KEY] ?: "",
                 asrBaseUrl = prefs[ASR_BASE_URL] ?: "https://dashscope.aliyuncs.com/compatible-mode/v1",
                 asrModel = prefs[ASR_MODEL] ?: "fun-asr-realtime-2026-02-28",
-                translateApiKey = prefs[TRANSLATE_API_KEY] ?: "REDACTED_KEY",
+                translateApiKey = prefs[TRANSLATE_API_KEY] ?: "",
                 translateBaseUrl = prefs[TRANSLATE_BASE_URL] ?: "http://127.0.0.1:8002/v1",
                 translateModel = prefs[TRANSLATE_MODEL] ?: "qwen3-1.7b",
                 cloudApiKey = prefs[CLOUD_API_KEY] ?: com.classroom.translator.BuildConfig.VOLC_API_KEY,
