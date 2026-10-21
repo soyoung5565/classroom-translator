@@ -44,9 +44,22 @@ class LocalVllmAsrStream(
     companion object {
         private const val TAG = "LocalVLLM"
         private const val SAMPLE_RATE = 16000
-        internal const val FLUSH_INTERVAL_MS = 2000L   // 轮询周期（检查句末）
+        private const val FLUSH_INTERVAL_MS = 2000L   // 轮询周期（检查句末）
         internal const val MIN_SILENCE_MS = 500L        // 静音超500ms视为句末（快一点出结果）
-        private const val SILENCE_RMS = 0.008f          // RMS 低于该值=静音（16k PCM 比例）
+        /**
+         * 静音判定阈值（归一化 RMS）。
+         * 【2026-10-20 下调】原为 0.008（≈ -42 dBFS）。但 AudioRecorder 现在会先做
+         * AGC 把语音抬到 ~0.05 RMS，0.008 这条线反而太低了 —— 底噪也会被判成"有声音"，
+         * 导致每段都发 ASR（空转发热）。同时下限必须留够余量给"刚开口的半个字"。
+         */
+        private const val SILENCE_RMS = 0.004f          // RMS 低于该值=静音（16k PCM 比例）
+        /**
+         * 语音判定阈值：必须高于这个电平才算"有人在说话"。
+         * 【2026-10-20】原逻辑只看"不是静音"就算有声音 → 底噪、键盘声、
+         * 桌面敲击都会被送去 ASR（浪费算力 + 出乱码 + 触发幻觉转写）。
+         * 现在要求明显高于底噪才认定为语音。
+         */
+        private const val VOICE_RMS = 0.012f           // 约 -38 dBFS，AGC 后正常语音远超此值
         private const val MIN_SEGMENT_MS = 800L          // 段最短 0.8s（太短不送）
 
         // ===== 前缀续听防卡死 =====
@@ -85,10 +98,18 @@ class LocalVllmAsrStream(
             pcmBuffer.write(pcm)
         }
         // 能量检测（静音计时）
+        // 【2026-10-20】两级判定：
+        //   低于 SILENCE_RMS → 静音（用于句末计时）
+        //   高于 VOICE_RMS   → 确认有人在说话（用于"这一段要不要送 ASR"）
+        //   介于两者之间     → 存疑：可能是在开口的第一个字，也可能只是底噪。
+        //     存疑时保持"上一个状态"不变（既不当静音也不当语音），
+        //     这样开口的第一个字不会被当成静音丢掉，而纯底噪也不会被当语音。
         val rms = calculateRms(pcm, pcm.size)
-        if (rms >= SILENCE_RMS) {
+        if (rms >= VOICE_RMS) {
             lastVoiceMs = now
             hasVoice = true
+        } else if (rms < SILENCE_RMS) {
+            // 明确的静音 → 更新句末计时（但不立刻清 hasVoice，由 isSentenceEnd 判断）
         }
         // 静音保护: 纯静音缓冲超 5s 直接丢, 不发 ASR 不占内存
         // (之前静音也会攒满 6s 被强发 -> 播完后 ASR 永续空转 = 停了还烫的元凶之一)

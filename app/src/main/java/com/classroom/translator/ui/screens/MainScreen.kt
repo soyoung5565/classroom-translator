@@ -610,7 +610,11 @@ private fun DockOverlay(
             horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
         ) {
             RecordFab(isRecording = isRecording, isProcessing = isProcessing, onClick = onToggle)
-            if (count > 0) {
+            // 【2026-10-20 修复 3】「完成」按钮不再要求识别到内容。
+            // 原先 `if (count > 0)` —— 零识别时按钮根本不出现，用户无法主动保存，
+            // 只能被迫走"停止录音"（而停止路径也不写 session 文件 → 录音白录）。
+            // 现在：只要在录音中，或已经有内容，按钮就可见可点。
+            if (count > 0 || isRecording) {
                 FinishPill(onClick = onFinish)
             }
         }

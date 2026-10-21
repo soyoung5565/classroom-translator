@@ -111,6 +111,22 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
 
     private var sessionStartTime: String = ""
 
+    /**
+     * 当前录音会话 id。
+     * 【2026-10-20】同一段录音可能被归档多次（FAB 停止 + 点「完成」+ 改设置），
+     * 用固定 id 覆盖写同一条记录，避免历史里出现重复条目。
+     */
+    private var currentSessionId: Long = 0L
+    /** 当前录音是否已归档（决定再次归档时是覆盖还是新建） */
+    private var sessionPersisted = false
+    /**
+     * 本地推理服务就绪前缓存的 PCM。
+     * 【2026-10-20】local_vllm 模式启动时要等模型加载（10-30s），这期间麦克风
+     * 已经在录了，但 pcmListener 还没挂上 → 开头说的话全丢。缓存起来补喂给 ASR。
+     */
+    private val pendingPcm = java.io.ByteArrayOutputStream()
+    private val PENDING_PCM_MAX = 16000 * 2 * 60   // 最多缓存 60s
+
     /** 本次录音起点（毫秒）；停止录音后归零。用于条目→录音偏移换算 */
     private var recStartMs = 0L
 
@@ -212,12 +228,52 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
 
+        // 新的一段录音 → 新会话 id
+        // 【2026-10-20】上一段若已归档（停止即保存），条目必须清空。
+        // 否则新会话会把上一段的条目再写一遍 → 历史里同一段内容出现两次。
+        if (sessionPersisted) {
+            Log.i(TAG, "startRecording: previous session archived, clearing ${_state.value.entries.size} entries")
+            _state.value = _state.value.copy(entries = emptyList())
+        }
+        currentSessionId = 0L
+        sessionPersisted = false
+        pendingPcm.reset()
+
+        // 【2026-10-20】麦克风异常上报到 UI。
+        // 原先麦克风被占用/读失败只在 logcat 里说一句，UI 照样显示"正在听..."，
+        // 用户完全不知道"为什么没声音"。现在直接弹提示。
+        audioRecorder.onMicError = { msg ->
+            Log.w(TAG, "Mic error: $msg")
+            _state.value = _state.value.copy(error = msg)
+        }
+
         audioRecorder.start()
         recStartMs = System.currentTimeMillis()
         // 【防冻结】会话期间跑前台服务：否则 App 退到后台会被 Android App Freezer 冻结，
         // 连带 ProcessBuilder 拉起的本地推理服务一起冻住（实测：切微信后服务不再响应）
         runCatching { com.classroom.translator.SessionForegroundService.start(getApplication()) }
         _state.value = _state.value.copy(isRecording = true, status = "正在听...", error = null)
+
+        // 【2026-10-20 修复 4】麦克风完全没声音 → 明确告知用户。
+        // 用户反馈"有时候完全不知道为什么就是没有声音，我声音很大了还是没有识别到内容"。
+        // 根因之一是麦克风被别的应用占用/HAL 失效，此时 AudioRecord 读到的全是 0，
+        // 但 UI 一直显示"正在听..."，用户只能干等。现在 5 秒后检测一次原始电平，
+        // 全零就直接提示（而不是等到整节课结束才发现白录）。
+        viewModelScope.launch(Dispatchers.Default) {
+            delay(5000)
+            if (!_state.value.isRecording) return@launch
+            val raw = audioRecorder.rawAudioLevel
+            val gain = audioRecorder.currentGain
+            if (raw <= 0.0001f) {
+                Log.w(TAG, "Mic silent after 5s: raw=$raw gain=$gain")
+                _state.value = _state.value.copy(
+                    status = "正在听...（未检测到声音）",
+                    error = "麦克风没有采集到任何声音。可能是被其它应用占用或已静音，请检查后重新开始。"
+                )
+            } else {
+                Log.i(TAG, "Mic ok after 5s: raw=$raw gain=$gain")
+            }
+        }
 
         // DashScope streaming mode
         if (_state.value.settings.asrMode == "dashscope") {
@@ -230,6 +286,26 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         if (_state.value.settings.asrMode == "local_vllm") {
             val s0 = _state.value.settings
             _state.value = _state.value.copy(status = "正在启动本地推理服务（首次约 10-30 秒）…")
+            // 【2026-10-20 修复 2】先挂上 PCM listener。
+            // 原先 listener 是在 startLocalVllmStreaming() 里挂的，而那要等模型加载完
+            // （10-30s）—— 这期间麦克风已经在录，但音频没人接 → 开头说的全丢。
+            // 现在：ASR 没就绪就先缓存（上限 60s），就绪后补喂。
+            audioRecorder.setPcmListener { pcm ->
+                val stream = localVllmStream
+                if (stream != null) {
+                    stream.feedAudio(pcm)
+                } else {
+                    synchronized(pendingPcm) {
+                        pendingPcm.write(pcm)
+                        if (pendingPcm.size() > PENDING_PCM_MAX) {
+                            val excess = pendingPcm.size() - PENDING_PCM_MAX
+                            val keep = pendingPcm.toByteArray()
+                            pendingPcm.reset()
+                            pendingPcm.write(keep, excess, keep.size - excess)
+                        }
+                    }
+                }
+            }
             viewModelScope.launch(Dispatchers.IO) {
                 val mgr = LocalLlmServerManager.get(getApplication())
                 val ok = mgr.start(s0.asrBaseUrl, s0.translateBaseUrl, blockUntilReady = true)
@@ -481,8 +557,24 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         // 把 AudioRecorder 的 PCM 流喂给 LocalVllmAsrStream
-        audioRecorder.setPcmListener { pcm ->
-            localVllmStream?.feedAudio(pcm)
+        // 【2026-10-20 修复 2】模型加载期间（10-30s）麦克风已经在录了，但
+        // ASR 还没就绪 → 开头说的话全丢。现在先缓存，就绪后补喂。
+        // 注：listener 是在 startRecording() 里就挂上的（见 local_vllm 分支），
+        //     这里只负责把缓存补喂进去。
+        val buffered = synchronized(pendingPcm) {
+            val b = pendingPcm.toByteArray()
+            pendingPcm.reset()
+            b
+        }
+        if (buffered.isNotEmpty()) {
+            Log.i(TAG, "Feeding ${buffered.size} buffered PCM bytes to ASR (missed during model load)")
+            // 分块喂（每次 0.5s），避免一次性塞太多导致段缓冲超限
+            var off = 0
+            while (off < buffered.size) {
+                val n = minOf(16000, buffered.size - off)
+                localVllmStream?.feedAudio(buffered.copyOfRange(off, off + n))
+                off += n
+            }
         }
         Log.i(TAG, "Local vLLM streaming started")
     }
@@ -520,6 +612,70 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
             audioLevel = 0f,
             status = "已停止"
         )
+
+        // 【2026-10-20 修复 1】停止录音就落盘。
+        // 原先 stopRecording() 只停设备不存档，存档完全依赖 finishSession()；
+        // 而 finishSession() 在 entries 为空时直接 return（不写任何 session 文件），
+        // 且「完成」按钮只在 count > 0 时才显示 —— 于是"点了开始但没识别到内容"
+        // 这一路，录音文件在磁盘上却没有任何 session 指向它，历史里根本看不到，等于白录。
+        // 现在：停止即归档，零识别也保留录音（可在详情页回放）。
+        archiveCurrentSession(audioPath)
+    }
+
+    /**
+     * 归档当前会话（写 session JSON）。
+     * @param audioPath 录音文件路径（可空 —— 没有任何音频时）
+     * @return 是否成功写入
+     */
+    private fun archiveCurrentSession(audioPath: String?): Boolean {
+        val entries = _state.value.entries
+        // 没有任何内容且没有录音文件 → 无可归档
+        if (entries.isEmpty() && audioPath.isNullOrBlank()) return false
+        // 【2026-10-20】同一段录音只归档一次。
+        // 停止录音会归档 → 用户随后点「完成」又会走一次归档，若不守卫，
+        // 第二次会用"空条目"覆盖第一次写好的 session（历史里就只剩一条空记录）。
+        if (sessionPersisted) {
+            Log.i(TAG, "archiveCurrentSession: already persisted (id=$currentSessionId), skip")
+            return true
+        }
+        if (currentSessionId == 0L) currentSessionId = System.currentTimeMillis()
+
+        val endTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+        val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val now = if (sessionStartTime.isBlank()) endTime else sessionStartTime
+        val dataEntries = entries.mapIndexed { i, e ->
+            val s = e.startSec
+            val end = when {
+                e.endSec >= 0 -> e.endSec
+                else -> {
+                    val nxt = entries.drop(i + 1).firstOrNull { it.startSec >= 0 }?.startSec
+                    when {
+                        nxt != null && nxt > s && s >= 0 -> nxt
+                        s >= 0 -> s + 15
+                        else -> -1
+                    }
+                }
+            }
+            TranslationEntryData(timestamp = e.timestamp, english = e.english, chinese = e.chinese, startSec = s, endSec = end)
+        }
+        // 零识别时给一句说明性的摘要（历史列表会显示它）
+        val summary = if (entries.isNotEmpty()) {
+            entries.first().english.let { if (it.length > 50) it.take(50) + "..." else it }
+        } else {
+            "录音已保存（未识别到语音内容）"
+        }
+        val session = TranslationSession(
+            id = currentSessionId,
+            date = date,
+            startTime = now,
+            endTime = endTime,
+            entries = dataEntries,
+            summary = summary
+        )
+        sessionManager.saveSession(session.copy(audioPath = audioPath ?: ""))
+        sessionPersisted = true
+        Log.i(TAG, "Session archived: id=$currentSessionId entries=${dataEntries.size} audio=$audioPath")
+        return true
     }
 
     fun startNewSession() {
@@ -532,7 +688,6 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         sessionStartTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
         _state.value = _state.value.copy(entries = emptyList(), status = "就绪", error = null)
     }
-
     fun deleteEntry(entryId: Long) {
         _state.value = _state.value.copy(entries = _state.value.entries.filter { it.id != entryId })
     }
@@ -544,8 +699,20 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
     fun finishSession() {
         val currentEntries = _state.value.entries
         val savedAudioPath = audioRecorder.getAudioFilePath()
+        // 【2026-10-20 修复 1】零识别也要保存。
+        // 原先这里 entries.isEmpty() 直接 return —— 不写 session 文件，
+        // 录音文件在磁盘上却没有任何 session 指向它，历史里看不到 = 白录。
+        // 现在：先停录音（stopRecording 内部已归档），再走整课重译。
         if (currentEntries.isEmpty()) {
-            stopRecording()
+            if (_state.value.isRecording) {
+                stopRecording()          // 内部会归档（零识别也存）
+            } else {
+                archiveCurrentSession(savedAudioPath)
+            }
+            _state.value = _state.value.copy(status = "已保存", entries = emptyList())
+            sessionStartTime = ""
+            currentSessionId = 0L
+            sessionPersisted = false
             return
         }
         if (_state.value.isRecording) stopRecording()
@@ -569,10 +736,11 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
             TranslationEntryData(timestamp = e.timestamp, english = e.english, chinese = e.chinese, startSec = s, endSec = end)
         }
         val summary = currentEntries.first().english.let { if (it.length > 50) it.take(50) + "..." else it }
-        val session = TranslationSession(id = System.currentTimeMillis(), date = date, startTime = now, endTime = endTime, entries = entries, summary = summary)
+        val session = TranslationSession(id = currentSessionId.takeIf { it > 0 } ?: System.currentTimeMillis(), date = date, startTime = now, endTime = endTime, entries = entries, summary = summary)
 
         // Save immediately with audio path
         sessionManager.saveSession(session.copy(audioPath = savedAudioPath ?: ""))
+        sessionPersisted = true
         Log.i(TAG, "Session saved with audio: $savedAudioPath, ${entries.size} entries")
 
         // 课后整课重译（"润色"核心）：分块云端重译 → 替换后重存并标记 polished。
@@ -591,6 +759,8 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) { Log.e(TAG, "Full-text correction failed: ${e.message}") }
             _state.value = _state.value.copy(entries = emptyList(), status = "已保存")
             sessionStartTime = ""
+            currentSessionId = 0L
+            sessionPersisted = false
         }
     }
 

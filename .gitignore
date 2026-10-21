@@ -18,3 +18,5 @@ replay_*.log
 build_apk.cmd
 tools/screen*.png
 classroom-translator-*.apk
+# 本地构建辅助脚本（MSYS 版 gradle wrapper，需本机 JDK 路径）
+gw.sh

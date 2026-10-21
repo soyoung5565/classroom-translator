@@ -32,6 +32,8 @@ class AudioRecorder(private val context: Context) {
         // 流式模式（local_vllm）无人 flush，不设上限会无限膨胀（32KB/s）
         // -> GC 压力 -> 发热。WAV 存档走独立文件流，清缓冲不丢录音。
         private const val MAX_PCM_BUFFER_BYTES = 2 * 1024 * 1024  // ~64s 音频
+        /** 连续多少次 read() 返回 0（无声）后判定麦克风异常 */
+        private const val SILENT_READ_THRESHOLD = 20   // 20 * 0.5s = 10s
     }
 
     private var audioRecord: AudioRecord? = null
@@ -40,7 +42,16 @@ class AudioRecorder(private val context: Context) {
     private val bufferLock = Any()
     private val pcmBuffer = ByteArrayOutputStream()
 
+    /** 增益处理链（AGC + 高通 + 软限幅）：小声也能被 ASR 识别 */
+    private val gainProcessor = AudioGainProcessor(SAMPLE_RATE)
+
     @Volatile var audioLevel: Float = 0f; private set
+    /** 原始（未经增益）输入电平 —— 用于判断"麦克风到底有没有收到声音" */
+    @Volatile var rawAudioLevel: Float = 0f; private set
+    /** 当前 AGC 增益倍数（诊断用：增益很高说明输入电平低） */
+    val currentGain: Float get() = gainProcessor.currentGain
+    /** 麦克风异常回调（被占用 / 读失败）—— UI 需要提示用户 */
+    @Volatile var onMicError: ((String) -> Unit)? = null
 
     /** 每次从麦克风读出 PCM 块后回调（用于 LocalVllmAsrStream 实时喂音频） */
     @Volatile private var pcmListener: ((ByteArray) -> Unit)? = null
@@ -83,6 +94,8 @@ class AudioRecorder(private val context: Context) {
                 }
                 recorder.startRecording()
                 isRecording = true
+                gainProcessor.reset()
+                rawAudioLevel = 0f
                 // Create audio file for saving
                 try {
                     val dir = File(context.getExternalFilesDir(null), "recordings")
@@ -101,20 +114,79 @@ class AudioRecorder(private val context: Context) {
                 // Start background reader thread
                 readerThread = Thread({
                     val readBuf = ByteArray(SAMPLE_RATE) // 0.5s buffer
+                    var silentReads = 0
+                    // 当前使用的 AudioRecord（出错时可替换为重建的实例）
+                    var rec: AudioRecord = recorder
                     while (isRecording) {
-                        val read = recorder.read(readBuf, 0, readBuf.size)
+                        val read = try {
+                            rec.read(readBuf, 0, readBuf.size)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "AudioRecord.read threw", e)
+                            -1
+                        }
                         if (read > 0) {
+                            silentReads = 0
+                            // 增益处理：小声被抬到可识别电平；高通去直流；软限幅防削波
+                            val processed = gainProcessor.process(readBuf.copyOf(read))
+                            // 原始电平（未增益）—— 用来判断麦克风是否真的收到了声音
+                            rawAudioLevel = AudioGainProcessor.normalizedRms(readBuf, read)
+                            audioLevel = AudioGainProcessor.normalizedRms(processed)
                             synchronized(bufferLock) {
-                                pcmBuffer.write(readBuf, 0, read)
+                                pcmBuffer.write(processed, 0, read)
+                                // 上限保护：流式模式无人 flush()，无上限会无限膨胀（32KB/s）
+                                // -> GC 压力 -> 发热。超限时丢弃最旧的数据。
+                                if (pcmBuffer.size() > MAX_PCM_BUFFER_BYTES) {
+                                    val excess = pcmBuffer.size() - MAX_PCM_BUFFER_BYTES
+                                    val keep = pcmBuffer.toByteArray()
+                                    pcmBuffer.reset()
+                                    pcmBuffer.write(keep, excess, keep.size - excess)
+                                    Log.w(TAG, "pcmBuffer overflow, dropped $excess bytes")
+                                }
                             }
-                            audioLevel = calculateRms(readBuf, read)
                             // 回调给 LocalVllmAsrStream 等消费方
-                            try { pcmListener?.invoke(readBuf.copyOf(read)) } catch (e: Exception) {}
+                            try { pcmListener?.invoke(processed) } catch (e: Exception) {}
                             // Save to file
-                            try { audioFileOutputStream?.write(readBuf, 0, read) } catch(e: Exception) {}
+                            try { audioFileOutputStream?.write(processed, 0, read) } catch (e: Exception) {}
                         } else if (read < 0) {
+                            // 麦克风被其它 App 占用（ERROR_DEAD_OBJECT=-6）或读失败。
+                            // 【2026-10-20 修复】原先直接 break 退出读线程 → 录音线程死掉，
+                            // 但 UI 仍显示"正在听..."，用户完全不知道发生了什么（"完全没有声音"）。
+                            // 现在：报告错误 + 重建 AudioRecord 继续录。
                             Log.e(TAG, "AudioRecord.read returned $read")
-                            break
+                            onMicError?.invoke("麦克风读取失败（可能被其它应用占用），正在尝试恢复")
+                            try { rec.stop(); rec.release() } catch (e: Exception) { }
+                            val recreated = try {
+                                AudioRecord(
+                                    MediaRecorder.AudioSource.MIC,
+                                    SAMPLE_RATE,
+                                    CHANNEL_CONFIG,
+                                    AUDIO_FORMAT,
+                                    maxOf(
+                                        AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT),
+                                        SAMPLE_RATE * 2
+                                    )
+                                ).also {
+                                    if (it.state == AudioRecord.STATE_INITIALIZED) it.startRecording() else it.release()
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to recreate AudioRecord", e); null
+                            }
+                            if (recreated == null || recreated.state != AudioRecord.STATE_INITIALIZED) {
+                                Log.e(TAG, "AudioRecord recovery failed, stopping capture")
+                                onMicError?.invoke("麦克风无法恢复，请关闭占用麦克风的应用后重试")
+                                break
+                            }
+                            audioRecord = recreated
+                            rec = recreated
+                            Log.i(TAG, "AudioRecord recreated, resuming capture")
+                        } else {
+                            // read == 0：读到 0 字节（罕见）。连续多次说明麦克风异常
+                            silentReads++
+                            if (silentReads >= SILENT_READ_THRESHOLD) {
+                                Log.e(TAG, "AudioRecord.read returned 0 for $silentReads consecutive times")
+                                onMicError?.invoke("麦克风持续无数据，请检查是否有应用占用")
+                                silentReads = 0
+                            }
                         }
                     }
                     Log.i(TAG, "Reader thread stopped")
@@ -156,6 +228,7 @@ class AudioRecorder(private val context: Context) {
         } catch (e: Exception) { Log.e(TAG, "Failed to finalize audio file", e) }
         audioFileOutputStream = null
         audioLevel = 0f
+        rawAudioLevel = 0f
         try {
             readerThread?.join(2000)
             audioRecord?.stop()
