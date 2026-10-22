@@ -1,7 +1,26 @@
 #!/usr/bin/env python3
 """
-给 Android arm64 ELF 追加 DT_NEEDED 依赖（无需重编译）。
+【已废弃 / 未采用】给 Android arm64 ELF 追加 DT_NEEDED 依赖（无需重编译）。
 
+⚠️ 结论：**这条路没走通，别用。**
+   真机上实测：libllamasrv.so 的 .dynstr 实际只剩 1 字节余量
+   （需要 16 字节放 "libc++_shared.so"）→ 无法追加，报错：
+       ".dynstr 空间不足（3027 < 3043）"
+   而 .dynstr 段头声明的 STRSZ(8108) 与实际占用(3027)不符，
+   这正是原来以为"有大量预留空间"的来源 —— 实际不可用。
+
+✅ 实际采用的修法（见 commit 27a1fea）：
+   1. libOpenCL.so 打包进 APK 的 jniLibs/arm64-v8a（随 nativeLibraryDir 一起）；
+   2. LD_LIBRARY_PATH 只含 nativeLibraryDir，不再指向 /vendor/lib64
+      （系统的 /vendor/lib64/libOpenCL.so NEEDED 私有 libc++.so，
+        独立 exec 时 linker namespace 不暴露 → __hash_memory 解析失败）；
+   3. 启动失败时把原因显示到界面，不再静默。
+
+保留本脚本仅作排查记录（它能打印 ELF 的 NEEDED/段布局，
+   定位"到底缺哪个符号"时有用）。
+
+以下为当时的尝试思路与实现：
+---------------------------------------------------------------------------
 用途：修复 libllamasrv.so 的链接符号缺失 ——
   libOpenCL.so 依赖 liblog.so + libc++.so，但 libllamasrv.so 自己的 NEEDED 里没有，
   ld.so 拉入 liblog.so 后解析不到 libc++ 的 __hash_memory → 整个二进制无法启动。
