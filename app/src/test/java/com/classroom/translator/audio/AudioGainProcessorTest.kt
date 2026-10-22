@@ -52,6 +52,22 @@ class AudioGainProcessorTest {
         assertTrue("抬高后不能爆表，实际 $after", after <= 1.0f)
     }
 
+    /**
+     * 【2026-10-22 回归测试】放大后不得削波。
+     *
+     * 起因：只按 RMS 算增益时，语音的瞬时峰值放大后冲到满量程，
+     * tanh 软限幅把波形压扁 → 失真 → 识别率下降。
+     * 真机证据（用户 10-20 的录音）：修复前 peak = 1.000。
+     */
+    @Test
+    fun outputNeverClips() {
+        // 峰值远高于 RMS 的信号（语音的典型特征）
+        val speech = speechOverNoise(voiceAmp = 0.02f, noiseAmp = 0.0005f, seconds = 3.0)
+        val out = AudioGainProcessor().process(speech)
+        val peak = out.maxOf { kotlin.math.abs(it.toInt().toShort().toInt()) } / 32768.0
+        assertTrue("输出不得削波，实际峰值 $peak", peak <= 0.90f)
+    }
+
     /** 正常音量的语音：不能被过度放大 */
     @Test
     fun normalSpeechIsNotOverAmplified() {

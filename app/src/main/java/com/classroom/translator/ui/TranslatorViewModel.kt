@@ -315,9 +315,14 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                         startLocalVllmStreaming()
                     } else {
                         Log.e(TAG, "本地服务启动失败: " + mgr.statusText())
+                        // 【2026-10-22】把失败原因说清楚，别只给一句"启动失败"。
+                        // 之前二进制链接失败（缺 libOpenCL.so / libc++ 不可见）时，
+                        // 界面只是安静地显示"正在听..."，用户完全不知道发生了什么。
+                        val depErr = mgr.depsError()
+                        val detail = if (depErr.isNotBlank()) depErr else mgr.statusText()
                         _state.value = _state.value.copy(
                             status = "本地服务启动失败",
-                            error = "本地推理服务启动失败：" + mgr.statusText()
+                            error = "本地推理服务启动失败：" + detail
                         )
                     }
                 }
@@ -629,14 +634,19 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun archiveCurrentSession(audioPath: String?): Boolean {
         val entries = _state.value.entries
-        // 没有任何内容且没有录音文件 → 无可归档
-        if (entries.isEmpty() && audioPath.isNullOrBlank()) return false
-        // 【2026-10-20】同一段录音只归档一次。
-        // 停止录音会归档 → 用户随后点「完成」又会走一次归档，若不守卫，
-        // 第二次会用"空条目"覆盖第一次写好的 session（历史里就只剩一条空记录）。
-        if (sessionPersisted) {
-            Log.i(TAG, "archiveCurrentSession: already persisted (id=$currentSessionId), skip")
-            return true
+        // 【2026-10-22】决策逻辑抽到 SessionArchivePolicy（可单元测试）：
+        //   零识别但有录音 → 归档；同一段只归档一次；什么都没有 → 不归档。
+        if (!SessionArchivePolicy.shouldArchive(
+                entryCount = entries.size,
+                hasAudioFile = !audioPath.isNullOrBlank(),
+                alreadyPersisted = sessionPersisted
+            )) {
+            Log.i(
+                TAG,
+                "archiveCurrentSession: skip (entries=${entries.size}, audio=${!audioPath.isNullOrBlank()}, " +
+                    "persisted=$sessionPersisted)"
+            )
+            return false
         }
         if (currentSessionId == 0L) currentSessionId = System.currentTimeMillis()
 
@@ -659,11 +669,7 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
             TranslationEntryData(timestamp = e.timestamp, english = e.english, chinese = e.chinese, startSec = s, endSec = end)
         }
         // 零识别时给一句说明性的摘要（历史列表会显示它）
-        val summary = if (entries.isNotEmpty()) {
-            entries.first().english.let { if (it.length > 50) it.take(50) + "..." else it }
-        } else {
-            "录音已保存（未识别到语音内容）"
-        }
+        val summary = SessionArchivePolicy.summaryFor(entries.size, entries.firstOrNull()?.english ?: "")
         val session = TranslationSession(
             id = currentSessionId,
             date = date,

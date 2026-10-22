@@ -77,6 +77,12 @@ class AudioGainProcessor(
         /** 一帧 20ms：16kHz 单声道 16bit = 320 采样 = 640 字节 */
         const val FRAME_SAMPLES = 320
 
+        /**
+         * 峰值余量：放大后允许达到的最大峰值（满量程 = 1.0）。
+         * 留 0.85 给 tanh 软限幅的过渡区，避免波形被压扁失真。
+         */
+        const val PEAK_HEADROOM = 0.85f
+
         /** 计算归一化 RMS（静态工具，0~1） */
         fun normalizedRms(pcm: ByteArray, length: Int = pcm.size): Float {
             if (length < 2) return 0f
@@ -114,6 +120,8 @@ class AudioGainProcessor(
     private var lastFrameSpeech = false
     private var framesSeen = 0
     private var framesSinceVoice = 0
+    /** 信号峰值（用于增益上限，保证放大后不削波） */
+    private var signalPeak = 0f
 
     /** 帧缓冲（高通后的样本） */
     private val frameBuf = FloatArray(FRAME_SAMPLES)
@@ -250,6 +258,22 @@ class AudioGainProcessor(
             gain + (target - gain) * 0.08f
         }
 
+        // 6b) 峰值限幅（peak limiting）。
+        //     【2026-10-22】只按 RMS 算增益不够：语音的瞬时峰值可以远高于 RMS，
+        //     放大后峰值直接冲到满量程 → tanh 软限幅把波形压扁 → 失真 → 识别率下降。
+        //     真机证据（用户 10-20 的录音）：RMS-based 增益后 peak = 1.000（满量程削平）。
+        //     这里用"帧内峰值"给增益设上限，保证输出峰值不超过 headroom。
+        var framePeak = 0f
+        for (k in 0 until count) {
+            val a = abs(frameBuf[k])
+            if (a > framePeak) framePeak = a
+        }
+        if (framePeak > signalPeak) signalPeak = framePeak else signalPeak = signalPeak * 0.98f
+        if (signalPeak > 1e-6f) {
+            val maxAllowed = PEAK_HEADROOM / signalPeak
+            if (maxAllowed < gain) gain = maxAllowed.coerceAtLeast(1f)
+        }
+
         // 6) 应用增益 + 软限幅。
         //    输出的是**高通后**的信号 —— 直流失真是被去掉的（否则 RMS 被 DC 抬高，
         //    语音会被误判，且模型收到带直流偏置的音频）。
@@ -285,6 +309,7 @@ class AudioGainProcessor(
         lastFrameSpeech = false
         framesSeen = 0
         framesSinceVoice = 0
+        signalPeak = 0f
     }
 }
 

@@ -24,6 +24,8 @@ class LocalLlmServerManager private constructor(private val app: Application) {
     companion object {
         private const val TAG = "LocalLlmServer"
         private const val BIN_NAME = "libllamasrv.so"      // jniLibs 中的名字
+        /** 【2026-10-22】GPU 加速库，必须与 BIN_NAME 一起打包（否则二进制无法启动） */
+        private const val OPENCL_LIB = "libOpenCL.so"
         private const val ASR_MODEL = "Qwen3-ASR-0.6B-Q8_0.gguf"
         private const val ASR_MMPROJ = "mmproj-Qwen3-ASR-0.6B-Q8_0.gguf"
         private const val TRANS_MODEL = "Qwen3-0.6B-Q4_K_M.gguf"
@@ -63,6 +65,19 @@ class LocalLlmServerManager private constructor(private val app: Application) {
         File(modelDir, ASR_MODEL).exists() &&
         File(modelDir, ASR_MMPROJ).exists() &&
         File(modelDir, TRANS_MODEL).exists()
+
+    /**
+     * 依赖库是否齐备。
+     *
+     * 【2026-10-22】libOpenCL.so 必须和 libllamasrv.so 一起打包进 jniLibs。
+     * 少了它 → 二进制启动时报 "library libOpenCL.so not found" → 本地 ASR 完全不可用，
+     * 而 App 界面只是安静地"正在听..."，用户完全不知道发生了什么。
+     */
+    fun depsReady(): Boolean = File(app.applicationInfo.nativeLibraryDir, OPENCL_LIB).exists()
+
+    /** 依赖库缺失时的说明（给 UI 显示） */
+    fun depsError(): String =
+        if (depsReady()) "" else "缺少 $OPENCL_LIB（GPU 加速库），本地识别无法启动"
 
     fun statusText(): String = buildString {
         append(if (wantRunning) "运行中" else "已停止")
@@ -144,8 +159,22 @@ class LocalLlmServerManager private constructor(private val app: Application) {
         pb.redirectErrorStream(true)
         pb.redirectOutput(ProcessBuilder.Redirect.appendTo(File(logDir, logName)))
         pb.environment().apply {
-            // 二进制依赖 libOpenCL.so（系统 /vendor/lib64），LD_LIBRARY_PATH 兜底
-            this["LD_LIBRARY_PATH"] = app.applicationInfo.nativeLibraryDir + ":/vendor/lib64:/system/lib64"
+            // 【2026-10-22 关键修复】LD_LIBRARY_PATH 只指向 App 自己的 nativeLibraryDir。
+            //
+            // 之前的写法是 nativeLibraryDir + ":/vendor/lib64:/system/lib64"，
+            // 结果本地推理服务 100% 起不来（用户反馈"完全没有声音"、一个字都识别不到）：
+            //   CANNOT LINK EXECUTABLE "libllamasrv.so": cannot locate symbol
+            //   "_ZNSt3__113__hash_memoryEPKvm" referenced by "/system/lib64/liblog.so"
+            //
+            // 原因：/vendor/lib64 里的 libOpenCL.so 被优先加载，而它 NEEDED libc++.so
+            // （私有 API）→ 拉入 liblog.so → liblog.so 需要 libc++ 的 __hash_memory。
+            // 但作为「独立可执行文件」启动时（不是 dlopen），Android linker namespace
+            // 只暴露公开 API 库，libc++ 不可见 → 符号解析失败 → 整个二进制无法启动。
+            //
+            // 修复：把 libOpenCL.so 打包进 APK（jniLibs），它就在 nativeLibraryDir，
+            //      且 LD_LIBRARY_PATH 不再包含 /vendor/lib64，避免加载到系统那份。
+            // 实测（真机 Android 17）：只留 nativeLibraryDir 时二进制正常启动。
+            this["LD_LIBRARY_PATH"] = app.applicationInfo.nativeLibraryDir
             this["MALLOC_ARENA_MAX"] = "2"   // P0 内存修复：抑制 malloc 多 arena 膨胀
         }
         pb.start().also { Log.i(TAG, "已启动 ${args.first()} ${args.drop(1).take(4).joinToString(" ")}...") }
