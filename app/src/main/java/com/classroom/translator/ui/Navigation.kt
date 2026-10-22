@@ -29,6 +29,19 @@ fun MainNavHost() {
         val ctx = LocalContext.current
         LaunchedEffect(Unit) {
             val intent = (ctx as? android.app.Activity)?.intent
+            // [debug-only] 录音必保存自检：`--ez selftest_record true`
+            // 走完整链路：开始录音 → 停止 → 归档 → 落盘。
+            // 用于在真机上验证「零识别也必须保存录音」这条规则（用户 2026-10-20 反馈）。
+            if (intent?.getBooleanExtra("selftest_record", false) == true) {
+                android.util.Log.i("SelfTest", "=== 录音保存自检开始 ===")
+                sharedViewModel.startNewSession()
+                delay(500)
+                sharedViewModel.startRecordingForTest()
+                delay(3000)
+                sharedViewModel.stopRecordingForTest()
+                delay(1500)
+                android.util.Log.i("SelfTest", "=== 录音保存自检结束 ===")
+            }
             if (intent?.getBooleanExtra("seed_demo", false) == true &&
                 sharedViewModel.state.value.entries.isEmpty()
             ) {

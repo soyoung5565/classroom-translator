@@ -213,6 +213,14 @@ class AudioRecorder(private val context: Context) {
     fun stop() {
         isRecording = false
         pcmListener = null
+        // 【2026-10-22 修复】先等读线程退出，再关闭文件流 + 修 WAV 头。
+        // 原顺序：close() → 改 header → join(读线程)。
+        //   读线程此刻还在循环里，可能正在 write() → 撞上已关闭的流 → 抛异常被
+        //   catch 吞掉 → **最后一段音频丢失**；而且 header 里的 dataSize 是在
+        //   读线程可能还在写的时候算的 → 长度也对不上。
+        // 现在：isRecording=false 让读线程自然退出 → join 等它真正结束 →
+        //       再 close + 按最终文件长度回填 header。
+        try { readerThread?.join(2000) } catch (e: Exception) { Log.e(TAG, "join reader", e) }
         // Close audio file and fix WAV header
         try {
             audioFileOutputStream?.close()
@@ -230,7 +238,6 @@ class AudioRecorder(private val context: Context) {
         audioLevel = 0f
         rawAudioLevel = 0f
         try {
-            readerThread?.join(2000)
             audioRecord?.stop()
             audioRecord?.release()
         } catch (e: Exception) {

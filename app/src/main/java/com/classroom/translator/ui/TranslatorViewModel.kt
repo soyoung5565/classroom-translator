@@ -1144,6 +1144,23 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    /**
+     * [debug-only] 真机自检：启动真实录音（走完整 startRecording 链路）。
+     * 配合 `--ez selftest_record true` 用于验证「零识别也必须保存录音」。
+     */
+    internal fun startRecordingForTest() {
+        Log.i(TAG, "startRecordingForTest")
+        startRecording()
+    }
+
+    /**
+     * [debug-only] 真机自检：停止录音（触发 stopRecording → archiveCurrentSession 落盘）。
+     */
+    internal fun stopRecordingForTest() {
+        Log.i(TAG, "stopRecordingForTest")
+        stopRecording()
+    }
+
     /** 当前时刻相对本次录音起点的偏移秒数（-1 = 非录音态，如种子数据/整课导入） */
     private fun offsetNow(): Int =
         if (recStartMs > 0) ((System.currentTimeMillis() - recStartMs) / 1000).toInt() else -1
