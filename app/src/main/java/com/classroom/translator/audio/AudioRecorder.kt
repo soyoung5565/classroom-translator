@@ -70,6 +70,12 @@ class AudioRecorder(private val context: Context) {
             Log.e(TAG, "No RECORD_AUDIO permission")
             return
         }
+        // 【2026-10-22 修复】先清空上一次的录音路径。
+        // 若本次 start() 早退（AudioRecord 初始化失败 / 麦克风被占用），
+        // audioFilePath 会**残留上一次的路径** → stopRecording() 拿到旧路径 →
+        // 新会话的 session JSON 指向了上一段录音（回放出来是另一段内容）。
+        // 现在：每次 start 都从 null 开始，失败就是 null（= 本次没有录音文件）。
+        audioFilePath = null
 
         val bufferSize = maxOf(
             AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT),
