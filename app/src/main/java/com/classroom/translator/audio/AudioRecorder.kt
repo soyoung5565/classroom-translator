@@ -45,6 +45,27 @@ class AudioRecorder(private val context: Context) {
     /** 增益处理链（AGC + 高通 + 软限幅）：小声也能被 ASR 识别 */
     private val gainProcessor = AudioGainProcessor(SAMPLE_RATE)
 
+    /**
+     * [debug-only] AGC 实时状态日志。
+     *
+     * 信号链路的修复（增益/阈值/高通）**从 UI 完全看不出来** —— 界面照样显示"正在听"，
+     * 用户说"没声音"时无法自证。必须能在真机 logcat 里看到 gain 到底有没有动。
+     *
+     * 真机证据：修复前 gain 恒为 1.0（AGC 停摆）；修复后能到几十倍。
+     */
+    private var agcTraceCounter = 0
+    init {
+        gainProcessor.onAgcState = { g, rms, nf, sl, voice ->
+            if (com.classroom.translator.BuildConfig.DEBUG) {
+                agcTraceCounter++
+                if (agcTraceCounter >= 25) {   // 每 25 帧（0.5s）打一行
+                    agcTraceCounter = 0
+                    Log.i(TAG, "AGC: gain=$g rms=$rms noiseFloor=$nf speechLevel=$sl voice=$voice")
+                }
+            }
+        }
+    }
+
     @Volatile var audioLevel: Float = 0f; private set
     /** 原始（未经增益）输入电平 —— 用于判断"麦克风到底有没有收到声音" */
     @Volatile var rawAudioLevel: Float = 0f; private set

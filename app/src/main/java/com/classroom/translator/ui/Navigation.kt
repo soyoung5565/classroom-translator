@@ -32,12 +32,17 @@ fun MainNavHost() {
             // [debug-only] 录音必保存自检：`--ez selftest_record true`
             // 走完整链路：开始录音 → 停止 → 归档 → 落盘。
             // 用于在真机上验证「零识别也必须保存录音」这条规则（用户 2026-10-20 反馈）。
+            //
+            // 【2026-10-24】时长可调：`--ei selftest_record_ms 30000`（毫秒，默认 3000）。
+            // 短时长用来快速验证"零识别也保存"，长时长用来验证 AGC 增益链
+            // （需要跑完整段真实录音才能看到小声段被抬起来）。
             if (intent?.getBooleanExtra("selftest_record", false) == true) {
-                android.util.Log.i("SelfTest", "=== 录音保存自检开始 ===")
+                val recordMs = intent.getIntExtra("selftest_record_ms", 3000).coerceIn(500, 120_000)
+                android.util.Log.i("SelfTest", "=== 录音保存自检开始 (${recordMs}ms) ===")
                 sharedViewModel.startNewSession()
                 delay(500)
                 sharedViewModel.startRecordingForTest()
-                delay(3000)
+                delay(recordMs.toLong())
                 sharedViewModel.stopRecordingForTest()
                 delay(1500)
                 android.util.Log.i("SelfTest", "=== 录音保存自检结束 ===")

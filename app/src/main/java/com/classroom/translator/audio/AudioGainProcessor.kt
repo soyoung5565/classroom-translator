@@ -162,6 +162,14 @@ class AudioGainProcessor(
     val noiseFloorLevel: Float get() = noiseFloor
 
     /**
+     * AGC 状态回调（gain / rms / noiseFloor / speechLevel / isVoice）。
+     *
+     * Android 侧（AudioRecorder）用它打实时日志 —— 信号链路的修复从 UI 完全看不出来，
+     * 必须在真机上看到 gain 到底有没有动。保持纯 Kotlin，不引 Android 依赖。
+     */
+    var onAgcState: ((gain: Float, rms: Float, noiseFloor: Float, speechLevel: Float, isVoice: Boolean) -> Unit)? = null
+
+    /**
      * 处理一块 PCM（16bit little-endian 单声道），返回同样长度的处理后 PCM。
      * 输入输出可以是不同的数组（内部不修改入参）。
      */
@@ -330,6 +338,12 @@ class AudioGainProcessor(
             out[outOffset + k * 2] = (s and 0xFF).toByte()
             out[outOffset + k * 2 + 1] = ((s shr 8) and 0xFF).toByte()
         }
+
+        // 6c) AGC 状态回调（纯 Kotlin，不引 Android 依赖，保持可在 JVM 单测里跑）。
+        //     信号链路的修复（增益/阈值）从 UI 完全看不出来 —— 界面照样显示"正在听"。
+        //     必须能在真机上看到实时 gain/noiseFloor/speechLevel 才能判断 AGC 有没有启动
+        //     （真机证据：修复前 gain 恒为 1.0，修复后能到几十倍）。
+        onAgcState?.invoke(g, rms, noiseFloor, speechLevel, isVoice)
     }
 
     /** tanh 软限幅：|x|<0.9 线性，超过后平滑压缩到 ±1 */
