@@ -60,10 +60,27 @@ class AudioGainProcessor(
      * 0.12 —— 语音的音节起伏度通常 > 0.2；空调嗡鸣/风扇噪声/纯音 < 0.05。
      */
     private val modulationThreshold: Float = 0.12f,
-    /** 语音电平 EMA 系数（越小越平滑，段内电平越稳定） */
+    /** 语音电平 EMA 系数（越小越平滑，段内电平越稳定）—— 只用于"变大声"方向 */
     private val speechLevelAlpha: Float = 0.03f,
-    /** 噪声底估计窗口（帧数）：50 帧 = 1 秒 */
-    private val windowFrames: Int = 50,
+    /**
+     * 语音电平 EMA 系数 —— 用于"变小声"方向。
+     *
+     * 【2026-10-23 修复】原先升降都用 0.03，导致一旦有人说过一句大声的，
+     * speechLevel 就长期停在那个高电平上 → gain = target/speechLevel 被压住，
+     * 后面整段小声**几乎不再被放大**（真机证据 user_205230.wav：
+     * 前段 -43 dBFS 被抬 +21 dB，20 秒后 -37 dBFS 只抬 -1.9 dB）。
+     * 小声方向必须快速跟随：约 1/0.15 ≈ 7 帧（0.13 秒）完成 63% 的跟随。
+     */
+    private val speechLevelFallAlpha: Float = 0.15f,
+    /**
+     * 噪声底估计窗口（帧数）：250 帧 = 5 秒。
+     *
+     * 【2026-10-23 修复】原为 1 秒。课堂场景老师**连续讲话**时，
+     * 1 秒窗口里几乎全是语音，10 百分位等于语音电平本身（实测 noiseFloor 冲到
+     * -32 dBFS = 正在说话的音量），于是"高于噪声底 1.6 倍"这条语音判据永远不成立
+     * → AGC 停摆 → 小声不被抬起。5 秒窗口才能跨过句间停顿抓到真正的环境底噪。
+     */
+    private val windowFrames: Int = 250,
     /**
      * 噪声底估计的初始值（0.0002 ≈ -74 dBFS）。
      * 刚开始还没统计到足够样本时用它，之后由百分位估计接管。
@@ -201,14 +218,29 @@ class AudioGainProcessor(
         lastFrameRms = rms
         framesSeen++
 
-        // 2) 噪声底估计：最近 windowFrames 帧（1 秒）RMS 的第 10 百分位。
+        // 2) 噪声底估计：最近 windowFrames 帧（5 秒）RMS 的第 10 百分位。
         //    用百分位而不是最小值 —— 最小值会被偶发爆音（碰麦、敲桌）拉低，
         //    百分位对离群值稳健。
+        //
+        //    【2026-10-23 修复】只取百分位还不够：课堂上老师**几乎连续讲话**时，
+        //    5 秒窗口里 10 百分位仍然落在语音电平上，噪声底会一路爬升到"正在说话的音量"
+        //    （真机实测 noiseFloor 冲到 0.026 ≈ -32 dBFS），于是"高于噪声底 1.6 倍"
+        //    这条判据永远不成立 → AGC 停摆 → 后面小声完全不放大。
+        //    改成经典的 minimum statistics 跟踪：**下降快、上升慢**。
+        //    测到低电平（句间停顿）立即采用，电平升上来只允许缓慢跟随，
+        //    这样连续讲话不会污染噪声底。
         rmsHistory.addLast(rms)
         while (rmsHistory.size > windowFrames) rmsHistory.removeFirst()
         if (rmsHistory.size >= 10) {
             val sorted = rmsHistory.sorted()
-            noiseFloor = max(sorted[sorted.size / 10], 0.000005f)
+            val candidate = max(sorted[sorted.size / 10], 0.000005f)
+            noiseFloor = if (candidate < noiseFloor) {
+                // 确认更安静 → 立即跟进（句间停顿马上把底噪打下来）
+                candidate
+            } else {
+                // 变响 → 每帧最多 +0.2%（≈ +0.87 dB/秒），环境噪声真变响时才跟得上
+                min(candidate, noiseFloor * 1.002f)
+            }
         }
 
         // 3) 电平起伏度：近 0.5 秒（25 帧）内 RMS 的相对标准差。
@@ -236,10 +268,19 @@ class AudioGainProcessor(
         lastFrameSpeech = isVoice
 
         // 5) 语音电平估计（EMA）：只用语音帧更新，停顿帧不动
-        //    → 增益在整段里保持恒定 → 信噪比全程不变（不会被噪声放大毁掉）
+        //    → 增益在**一句话内**保持恒定 → 信噪比不受影响。
+        //
+        //    【2026-10-23 修复】升降必须用不同系数：
+        //    - 变大声：慢跟随（0.03），避免一句话里音量起伏带动增益抖动；
+        //    - 变小声：快跟随（0.15），否则前面一句大声会把 gain 锁死在高电平对应的
+        //      低增益上，后面整段小声都抬不起来 —— 正是用户"声音小就识别不到"的残留成因。
         if (isVoice) {
             framesSinceVoice = 0
-            speechLevel = if (speechLevel <= 0f) rms else speechLevel + (rms - speechLevel) * speechLevelAlpha
+            speechLevel = when {
+                speechLevel <= 0f -> rms
+                rms > speechLevel -> speechLevel + (rms - speechLevel) * speechLevelAlpha
+                else -> speechLevel + (rms - speechLevel) * speechLevelFallAlpha
+            }
         } else {
             framesSinceVoice++
             // 长时间无声（> 2 秒）才让语音电平缓慢回落
@@ -251,11 +292,16 @@ class AudioGainProcessor(
         if (speechLevel > 1e-9f) {
             target = (targetRms / speechLevel).coerceIn(1f, maxGain)
         }
-        // 增益平滑：升快一点（跟得上说话开始），降慢一点（段内电平稳定）
+        // 增益平滑：
+        //  - 升增益慢一点（0.3），跟得上开口但不会瞬间冲高；
+        //  - 降增益必须快（0.5）—— 【2026-10-23 修复】原来是 0.08，从大增益
+        //    （如 19 倍）回落要 30 帧（0.6 秒）以上，这期间"突然大声说话"
+        //    会被过度放大接近削波（真机实测：轻语音段后 1 秒的响语音被多抬 +8 dB）。
+        //    宁可短暂偏轻，也不能过载失真。
         gain = if (target > gain) {
             gain + (target - gain) * 0.3f
         } else {
-            gain + (target - gain) * 0.08f
+            gain + (target - gain) * 0.5f
         }
 
         // 6b) 峰值限幅（peak limiting）。
