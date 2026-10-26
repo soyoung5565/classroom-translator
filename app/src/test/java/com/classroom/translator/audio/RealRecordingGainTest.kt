@@ -37,6 +37,24 @@ class RealRecordingGainTest {
             println("SKIP: 找不到真机录音 $path")
             return ShortArray(0)
         }
+        return readWavStream(f)
+    }
+
+    /** 从 classpath 资源读 WAV —— 测试夹具随代码走，不依赖本机绝对路径 */
+    private fun readWavFromClasspath(resource: String): ShortArray {
+        val stream = javaClass.classLoader?.getResourceAsStream(resource) ?: return ShortArray(0)
+        return stream.use { input ->
+            val tmp = File.createTempFile("fixture", ".wav")
+            try {
+                tmp.outputStream().use { input.copyTo(it) }
+                readWavStream(tmp)
+            } finally {
+                tmp.delete()
+            }
+        }
+    }
+
+    private fun readWavStream(f: File): ShortArray {
         RandomAccessFile(f, "r").use { raf ->
             val riff = ByteArray(4); raf.read(riff)
             if (String(riff) != "RIFF") return ShortArray(0)
@@ -80,11 +98,11 @@ class RealRecordingGainTest {
 
     @Test
     fun realQuietSpeechIsBoostedAndLoudSpeechIsUntouched() {
-        val path = "D:/hermes-data/cache/scratch/ct/user_205230.wav"
-        val pcm = readWav(path)
+        // 测试夹具：用户 2026-10-20 的真机录音（23.5 秒），直接从设备录音目录复制的原始 WAV。
+        // 走 classpath 而不是绝对路径 —— 换机器/清缓存后依然可跑，回归不会静默失效。
+        val pcm = readWavFromClasspath("fixtures/user_205230_quiet_speech.wav")
         if (pcm.isEmpty()) {
-            println("SKIP: 真机录音不可用（文件缺失），跳过")
-            return
+            throw AssertionError("测试夹具缺失：app/src/test/resources/fixtures/user_205230_quiet_speech.wav")
         }
         println("真机录音: ${pcm.size} 采样 = ${"%.1f".format(pcm.size.toDouble() / sampleRate)} 秒")
 
