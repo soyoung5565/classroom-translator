@@ -114,7 +114,7 @@ fun RepairScreen(
                     busy = state.busy,
                     onDiagnose = { viewModel.diagnose() },
                     onAutoRepair = { viewModel.autoRepair(includeModelRepair = false) },
-                    onAskAi = { viewModel.askAi() },
+                    onAskAi = { viewModel.runAgent() },
                     onRestore = { showRestoreDialog = true },
                     onRepairModels = { showModelRepairDialog = true },
                 )
@@ -184,6 +184,9 @@ fun RepairScreen(
                 // ── 体检结果 ──
                 state.report?.let { report -> FindingsList(report) }
 
+                // ── AI Agent 执行过程 ──
+                state.agentResult?.let { result -> AgentResultCard(result) }
+
                 // ── AI 建议 ──
                 state.advice?.let { advice -> AdviceCard(advice) }
 
@@ -206,30 +209,27 @@ fun RepairScreen(
     }
 
     // ── 恢复初始形态 确认框 ──
+    // 【2026-11-02】去掉了「清除课堂记录」「删除模型」两个勾选项 ——
+    // 用户明确要求「初始形态不要把东西也删了」。恢复 = 改回去，不是删掉。
     if (showRestoreDialog) {
-        var clearSessions by remember { mutableStateOf(false) }
-        var keepModels by remember { mutableStateOf(true) }
         AlertDialog(
             onDismissRequest = { showRestoreDialog = false },
             title = { Text("恢复初始形态") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("将把所有设置恢复到出厂默认，并重启本地服务。", fontSize = 13.sp)
-                    CheckRow("同时清除课堂记录", clearSessions) { clearSessions = it }
-                    CheckRow("保留已下载的模型（推荐）", keepModels) { keepModels = it }
-                    if (!keepModels) {
-                        Text(
-                            "注意：删除模型后需要重新下载约 1.4GB。",
-                            fontSize = 11.sp,
-                            color = cs.error,
-                        )
-                    }
+                    Text(
+                        "不会删除任何东西：课堂记录和已下载的模型都会原样保留。",
+                        fontSize = 11.sp,
+                        lineHeight = 17.sp,
+                        color = cs.onSurfaceVariant,
+                    )
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
                     showRestoreDialog = false
-                    viewModel.restoreFactory(clearSessions = clearSessions, keepModels = keepModels)
+                    viewModel.restoreFactory()
                 }) { Text("恢复", color = cs.primary) }
             },
             dismissButton = {
@@ -328,8 +328,8 @@ private fun ActionGrid(
         )
         RepairButton(
             icon = Icons.Outlined.Psychology,
-            title = "AI 诊断",
-            desc = "让云端大模型解读体检结果，给出原因解释与修复优先级",
+            title = "AI 自动修复",
+            desc = "云端大模型自己调用工具动手修：重启服务、纠正配置、补下载模型、迁移存储",
             enabled = !busy,
             onClick = onAskAi,
         )
@@ -343,7 +343,7 @@ private fun ActionGrid(
         RepairButton(
             icon = Icons.Outlined.CleaningServices,
             title = "恢复初始形态",
-            desc = "所有设置回到出厂默认，重启本地服务",
+            desc = "所有设置回到出厂默认（不删除课堂记录与模型），重启本地服务",
             enabled = !busy,
             onClick = onRestore,
             danger = true,
@@ -443,6 +443,113 @@ private fun FindingsList(report: Diagnostics.Report) {
             }
         }
     }
+}
+
+/**
+ * AI 自动修复的执行过程。
+ *
+ * 关键是让用户看见「AI 真的动手了」：每一次工具调用都列出工具名、参数、
+ * 真实执行结果 —— 而不是给一段"建议你这样修"的文字。
+ */
+@Composable
+private fun AgentResultCard(result: com.classroom.translator.repair.RepairAgent.Result) {
+    val cs = MaterialTheme.colorScheme
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(cs.surfaceContainerLow)
+            .border(1.dp, AppTheme.tokens.hairline, RoundedCornerShape(14.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Psychology, contentDescription = null, tint = cs.primary, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("AI 自动修复", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = cs.onSurface)
+            Spacer(Modifier.weight(1f))
+            Text(
+                "${result.toolCallCount} 次工具调用",
+                fontSize = 11.sp,
+                color = cs.onSurfaceVariant,
+            )
+        }
+
+        result.rounds.forEach { r ->
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(cs.surfaceContainer)
+                    .padding(11.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (r.success) "✓" else "✗",
+                        fontSize = 12.sp,
+                        color = if (r.success) cs.primary else cs.error,
+                        modifier = Modifier.width(16.dp),
+                    )
+                    Text(
+                        "第${r.index}轮 · ${toolLabel(r.toolName)}",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = cs.onSurface,
+                    )
+                }
+                if (r.result.isNotBlank()) {
+                    Text(r.result, fontSize = 11.sp, lineHeight = 16.sp, color = cs.onSurfaceVariant)
+                }
+            }
+        }
+
+        if (result.summary.isNotBlank()) {
+            Spacer(Modifier.height(2.dp))
+            // AI 的总结里带 markdown（**加粗**、列表符）—— 这里不做富文本渲染，
+            // 直接剥掉标记显示纯文本（避免出现裸的 ** 和 # 符号）。
+            Text(
+                stripMarkdown(result.summary),
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
+                color = cs.onSurface,
+            )
+        }
+        Text(
+            "结束原因：${result.stoppedReason}",
+            fontSize = 10.sp,
+            color = cs.onSurfaceVariant.copy(alpha = 0.8f),
+        )
+    }
+}
+
+/**
+ * 剥掉 AI 输出里的 markdown 标记（显示用，不做富文本渲染）。
+ * 处理：**加粗**、`代码`、# 标题、- 列表符、> 引用。
+ */
+private fun stripMarkdown(raw: String): String {
+    // 用原始字符串（"""..."""）避开所有转义 ——
+    // Kotlin 字符串里 \` 是非法转义（Java 才有），所以正则必须用原始字符串写。
+    var s = raw
+    s = s.replace(Regex("(?s)" + "```" + ".*?" + "```" + ""), "")
+    s = s.replace(Regex("""`([^`]*)`"""), "$1")
+    s = s.replace(Regex("""(?s)\*\*(.*?)\*\*"""), "$1")
+    s = s.replace(Regex("""(?s)\*(.*?)\*"""), "$1")
+    return s.lines().joinToString("\n") { line ->
+        line.trimStart().removePrefix("#").removePrefix(">").trimStart()
+            .let { if (it.startsWith("- ") || it.startsWith("* ")) it.drop(2) else it }
+    }.trim()
+}
+
+/** 工具名 → 中文显示名 */
+private fun toolLabel(name: String): String = when (name) {
+    "diagnose_app" -> "体检"
+    "restart_local_service" -> "重启本地服务"
+    "repair_configuration" -> "纠正配置"
+    "download_missing_models" -> "下载缺失模型"
+    "migrate_models_to_safe_storage" -> "迁移模型到安全目录"
+    "verify_local_endpoints" -> "探测本地端点"
+    else -> name
 }
 
 @Composable

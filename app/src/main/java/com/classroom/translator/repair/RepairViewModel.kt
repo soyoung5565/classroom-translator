@@ -21,8 +21,10 @@ data class RepairUiState(
     val diagnosing: Boolean = false,
     /** 体检报告 */
     val report: Diagnostics.Report? = null,
-    /** AI 诊断建议 */
+    /** AI 诊断建议（只给建议，不动手） */
     val advice: AiRepairAdvisor.Advice? = null,
+    /** AI Agent 的执行结果（真的动手改了） */
+    val agentResult: RepairAgent.Result? = null,
     /** 是否正在修复 */
     val repairing: Boolean = false,
     /** 修复结果 */
@@ -48,6 +50,7 @@ class RepairViewModel(app: Application) : AndroidViewModel(app) {
     private val diagnostics = Diagnostics(app)
     private val advisor = AiRepairAdvisor(OpenAiApi())
     private val engine = RepairEngine(app, settingsRepo)
+    private val agent = RepairAgent(app, settingsRepo)
 
     private val _state = MutableStateFlow(RepairUiState())
     val state: StateFlow<RepairUiState> = _state.asStateFlow()
@@ -71,19 +74,35 @@ class RepairViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** 跑 AI 诊断（接云端 LLM 解读体检结果） */
-    fun askAi() {
+    /**
+     * 跑 AI 自动修复（Agent 模式）。
+     *
+     * 【2026-11-02 用户明确要求】「我要的不是可以给建议的 AI，
+     * 我又没有工具可以调用，就不能让 AI 调用工具自修复吗」
+     * → 这里跑的是完整的 Agent 循环：LLM 决定调哪个工具 → 真实执行 →
+     *   结果回喂 → LLM 继续调，直到体检无严重问题。
+     */
+    fun runAgent() {
         if (_state.value.busy) return
-        val report = _state.value.report ?: run { diagnose(); return }
-        _state.value = _state.value.copy(diagnosing = true, error = null, progress = "AI 诊断中…")
+        _state.value = _state.value.copy(
+            diagnosing = true, error = null, progress = "AI 正在诊断…", agentResult = null
+        )
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val settings = settingsRepo.settings.first()
-                val advice = advisor.advise(report, settings)
-                _state.value = _state.value.copy(diagnosing = false, advice = advice, progress = "")
-            } catch (e: Exception) {
+                val result = agent.run { msg -> _state.value = _state.value.copy(progress = msg) }
                 _state.value = _state.value.copy(
-                    diagnosing = false, error = "AI 诊断失败：${e.message}", progress = ""
+                    diagnosing = false, agentResult = result, progress = "",
+                    report = result.finalReport,
+                )
+                Log.i(
+                    TAG,
+                    "agent: toolCalls=${result.toolCallCount} succeeded=${result.succeeded} " +
+                        "reason=${result.stoppedReason}"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "agent failed", e)
+                _state.value = _state.value.copy(
+                    diagnosing = false, error = "AI 自动修复失败：${e.message}", progress = ""
                 )
             }
         }
@@ -109,13 +128,15 @@ class RepairViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** 恢复初始形态 */
-    fun restoreFactory(clearSessions: Boolean = false, keepModels: Boolean = true) {
+    /**
+     * 恢复初始形态 —— 只把设置改回默认，**不删除**课堂记录与模型。
+     */
+    fun restoreFactory() {
         if (_state.value.busy) return
         _state.value = _state.value.copy(repairing = true, error = null, progress = "恢复中…", result = null)
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val result = engine.restoreFactory(clearSessions, keepModels) { msg ->
+                val result = engine.restoreFactory { msg ->
                     _state.value = _state.value.copy(progress = msg)
                 }
                 _state.value = _state.value.copy(repairing = false, result = result, progress = "")

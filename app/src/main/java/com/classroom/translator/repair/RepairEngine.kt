@@ -161,14 +161,19 @@ class RepairEngine(
     }
 
     /**
-     * 恢复初始形态 —— 把 App 恢复到刚装好的样子。
+     * 恢复初始形态 —— 把 **设置** 恢复到刚装好的样子。
      *
-     * @param clearSessions 是否清掉课堂记录（默认保留 —— 用户的课不能被工具弄丢）
-     * @param keepModels 是否保留已下载的模型（保留 —— 重下 1.4GB 是用户最烦的事）
+     * 【2026-11-02 用户明确纠正】「初始形态不要把东西也删了，这个应该没错吧。」
+     * → 确认：**恢复 = 改回去，不是删掉**。
+     *   - 设置（识别地址/模型名/密钥/语种/档位）→ 回到出厂默认；
+     *   - 课堂记录 → **原样保留**（用户的课不可再生，比配置值钱得多）；
+     *   - 已下载的模型 → **原样保留**（重下 1.4GB 是用户最烦的事）。
+     *
+     * 删除类动作（清课堂记录 / 删模型）已经从这个入口彻底移除 ——
+     * 那是独立的高危操作，不该和"恢复默认"混在一起，让人误点。
+     * 真要删的话，App 内本来就有逐条删除的入口。
      */
     suspend fun restoreFactory(
-        clearSessions: Boolean = false,
-        keepModels: Boolean = true,
         onProgress: (String) -> Unit = {},
     ): Result {
         val steps = mutableListOf<Step>()
@@ -179,25 +184,32 @@ class RepairEngine(
         settingsRepo.resetToDefaults()
         steps.add(Step("恢复默认设置", true, "识别/翻译/云端配置已回到出厂值"))
 
-        // ── 2. 会话记录 ──
-        if (clearSessions) {
-            onProgress("清除课堂记录…")
-            val sm = SessionManager(context)
-            val n = sm.loadSessions().size
-            sm.clearAll()
-            steps.add(Step("清除课堂记录", true, "已删除 $n 条会话"))
+        // ── 2. 把模型挪到安全目录（不删，只是换个位置）──
+        onProgress("检查模型存放位置…")
+        if (modelStore.isDurable()) {
+            steps.add(Step("模型存放位置", true, "模型已在共享存储（抗清除数据）"))
         } else {
-            steps.add(Step("保留课堂记录", true, "课堂记录已保留（不受影响）"))
+            val moved = modelStore.migrateFromLegacy()
+            steps.add(
+                Step(
+                    "模型存放位置", true,
+                    if (moved > 0) "已迁移 ${modelStore.human(moved)} 到共享存储"
+                    else "模型保留在 App 专属目录（未授予「所有文件访问权限」，不影响使用）",
+                    skipped = moved <= 0,
+                )
+            )
         }
 
-        // ── 3. 模型 ──
-        if (keepModels) {
-            steps.add(Step("保留本地模型", true, "模型已保留，无需重新下载"))
-        } else {
-            onProgress("删除本地模型…")
-            val freed = modelStore.deleteAll()
-            steps.add(Step("删除本地模型", true, "已释放 ${modelStore.human(freed)}"))
-        }
+        // ── 3. 课堂记录：明确保留 ──
+        val sessionCount = SessionManager(context).loadSessions().size
+        steps.add(
+            Step(
+                "课堂记录", true,
+                if (sessionCount > 0) "$sessionCount 条课堂记录已保留，未做任何改动"
+                else "没有课堂记录，无需处理",
+                skipped = true,
+            )
+        )
 
         // ── 4. 重启服务 ──
         onProgress("重启本地服务…")
