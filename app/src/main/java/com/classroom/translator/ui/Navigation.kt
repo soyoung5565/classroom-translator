@@ -14,6 +14,8 @@ import com.classroom.translator.ui.screens.HistoryScreen
 import com.classroom.translator.ui.screens.MainScreen
 import com.classroom.translator.ui.screens.SessionDetailScreen
 import com.classroom.translator.ui.screens.SettingsScreen
+import com.classroom.translator.ui.screens.RepairScreen
+import com.classroom.translator.repair.RepairViewModel
 import com.classroom.translator.ui.screens.WholeSessionScreen
 
 @Composable
@@ -144,7 +146,16 @@ fun MainNavHost() {
         composable("settings") {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
-                viewModel = sharedViewModel
+                viewModel = sharedViewModel,
+                onNavigateToRepair = { navController.navigate("repair") }
+            )
+        }
+        // 【2026-11-02】自修复 / 恢复初始形态工具
+        composable("repair") {
+            val repairViewModel: RepairViewModel = viewModel()
+            RepairScreen(
+                onBack = { navController.popBackStack() },
+                viewModel = repairViewModel
             )
         }
     }

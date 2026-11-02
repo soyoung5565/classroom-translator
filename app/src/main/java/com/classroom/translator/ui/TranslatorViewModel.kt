@@ -275,15 +275,26 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
 
-        // DashScope streaming mode
-        if (_state.value.settings.asrMode == "dashscope") {
-            startDashScopeStreaming()
-            return
+        // 【2026-11-02】本地推理是唯一的识别路径。
+        //
+        // 原先这里还有一个 DashScope 云端分支（asrMode == "dashscope"）。
+        // 用户实测：切翻译引擎后录音报 `401 Unauthorized`（Expected HTTP 101 response），
+        // 根因是 SettingsRepository.update() 把 asrMode 悄悄写成了 "dashscope"，
+        // 于是 App 走云端 WebSocket，而密钥从没配过。
+        //
+        // 现在做两件事：
+        //   1. 设置层已把 asrMode 一律收敛到 "local_vllm"（见 defaultSettings）；
+        //   2. 这里再加一道运行时护栏 —— 万一 DataStore 里残留了旧值，
+        //      也绝不偷偷切去云端，而是按本地路径走。
+        // 云端 ASR 能力保留在 DashScopeAsrStream 里（未来若要恢复，走设置页显式开关）。
+        val asrMode = _state.value.settings.asrMode
+        if (asrMode != "local_vllm") {
+            Log.w(TAG, "非本地识别模式被拦截：asrMode=$asrMode → 强制走本地推理")
         }
 
         // Local vLLM (Qwen3-ASR) sentence-level streaming mode
         // [手机自足] 本地推理服务由 App 自己拉起（无需电脑/adb）；首次冷启动加载模型约 10-30 秒
-        if (_state.value.settings.asrMode == "local_vllm") {
+        run {
             val s0 = _state.value.settings
             _state.value = _state.value.copy(status = "正在启动本地推理服务（首次约 10-30 秒）…")
             // 【2026-10-20 修复 2】先挂上 PCM listener。

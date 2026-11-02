@@ -112,6 +112,23 @@ class SessionManager(private val context: Context) {
         }
     }
 
+    /**
+     * 清空全部会话记录（恢复初始形态时可选调用）。
+     * 只删 sessions/ 目录下的 JSON，不动录音/导出文件 —— 后者由调用方另行处理。
+     */
+    fun clearAll() {
+        try {
+            val files = sessionsDir.listFiles() ?: return
+            var n = 0
+            for (f in files) {
+                if (f.name.endsWith(".json") && f.delete()) n++
+            }
+            Log.i(TAG, "clearAll: deleted $n session files")
+        } catch (e: Exception) {
+            Log.e(TAG, "clearAll failed", e)
+        }
+    }
+
     fun exportSessionToText(session: TranslationSession): String {
         val sb = StringBuilder()
         sb.append("课堂翻译记录")

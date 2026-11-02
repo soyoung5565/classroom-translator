@@ -26,6 +26,10 @@ class LocalLlmServerManager private constructor(private val app: Application) {
         private const val BIN_NAME = "libllamasrv.so"      // jniLibs 中的名字
         /** 【2026-10-22】GPU 加速库，必须与 BIN_NAME 一起打包（否则二进制无法启动） */
         private const val OPENCL_LIB = "libOpenCL.so"
+        /**
+         * 【2026-11-02】模型文件名不再硬编码在这里，统一由 [ModelStore] 提供
+         * （下载、校验、迁移都走那一处，避免两处文件名对不上）。
+         */
         private const val ASR_MODEL = "Qwen3-ASR-0.6B-Q8_0.gguf"
         private const val ASR_MMPROJ = "mmproj-Qwen3-ASR-0.6B-Q8_0.gguf"
         private const val TRANS_MODEL = "Qwen3-0.6B-Q4_K_M.gguf"
@@ -51,20 +55,29 @@ class LocalLlmServerManager private constructor(private val app: Application) {
     /** 翻译会话进行中：此时即使 App 退到后台（如切去微信）也**不释放**服务 */
     @Volatile private var sessionActive = false
     @Volatile private var lastError: String? = null
+    /** 正在后台自动下载模型（避免重复触发） */
+    @Volatile var autoDownloading: Boolean = false
     private var watchThread: Thread? = null
     private var killHandler: android.os.Handler? = null
     private var activitiesStarted = 0
 
     private val binFile: File get() = File(app.applicationInfo.nativeLibraryDir, BIN_NAME)
-    private val modelDir: File get() = File(app.getExternalFilesDir(null), "models")
+    /** 【2026-11-02】模型目录改由 ModelStore 决定 —— 优先共享存储，清应用数据不会删 */
+    val modelStore: ModelStore = ModelStore(app)
+    private val modelDir: File get() = modelStore.modelDir()
     private val logDir: File get() = File(app.getExternalFilesDir(null), "logs").apply { mkdirs() }
 
-    /** 模型/二进制是否齐备（供 UI 提示） */
+    /** 模型/二进制是否齐备（供 UI 提示）—— 现在带大小校验，能识别"下到一半的坏文件" */
     fun assetsReady(): Boolean =
-        binFile.exists() &&
-        File(modelDir, ASR_MODEL).exists() &&
-        File(modelDir, ASR_MMPROJ).exists() &&
-        File(modelDir, TRANS_MODEL).exists()
+        binFile.exists() && modelStore.allReady()
+
+    /** 缺失/损坏的模型说明（给 UI 显示） */
+    fun assetsError(): String {
+        if (!binFile.exists()) return "缺少本地推理可执行文件（$BIN_NAME）"
+        val broken = modelStore.brokenModels()
+        if (broken.isEmpty()) return ""
+        return broken.joinToString("；") { it.problem() ?: "" }
+    }
 
     /**
      * 依赖库是否齐备。
@@ -88,14 +101,35 @@ class LocalLlmServerManager private constructor(private val app: Application) {
 
     /** 由 UI 调用：解析设置里的端口（默认 8080 / 8002）后拉起 */
     fun start(asrUrl: String?, transUrl: String?, blockUntilReady: Boolean): Boolean {
+        currentAsrUrl = asrUrl
+        currentTransUrl = transUrl
         asrPort = portOf(asrUrl, 8080)
         transPort = portOf(transUrl, 8002)
         wantRunning = true
         sessionActive = true
         lastError = null
         if (!assetsReady()) {
-            lastError = "本地模型或可执行文件缺失"
-            Log.e(TAG, "$lastError: bin=${binFile.exists()} dir=$modelDir")
+            // 【2026-11-02】说清楚缺什么、缺多少，而不是一句"缺失"。
+            // 用户看到的原话是「本地推理服务启动失败：运行中 | ASR:DOWN 翻译:DOWN | 最后错误: 本地模型或可执行文件缺失」——
+            // 定位不到是哪个模型、也没告诉他模型住在哪、怎么找回。
+            val detail = assetsError().ifBlank { "模型文件缺失或损坏" }
+            lastError = detail
+            Log.e(TAG, "$lastError: bin=${binFile.exists()} dir=$modelDir durable=${modelStore.isDurable()}")
+
+            // 模型缺失是「清除应用数据」之后最常见的故障 —— 后台自动重新下载，
+            // 用户不用再去设置页手动点一次。下载完看门狗会把它拉起来。
+            if (binFile.exists()) {
+                autoDownloading = true
+                Thread {
+                    runCatching {
+                        // ensureAssets 是 suspend —— 在普通线程里用 runBlocking 驱动
+                        kotlinx.coroutines.runBlocking { ensureAssets() }
+                    }
+                    autoDownloading = false
+                    Log.i(TAG, "auto download finished: ${statusText()}")
+                }.also { it.isDaemon = true; it.start() }
+                lastError = "$detail（正在自动重新下载，完成后会自动启动）"
+            }
             return false
         }
         if (!healthy(transPort)) { transProc = spawn(transArgs(), "trans.log"); transStartedAt = System.currentTimeMillis() }
@@ -109,6 +143,34 @@ class LocalLlmServerManager private constructor(private val app: Application) {
         }
         lastError = "本地服务启动超时"
         return false
+    }
+
+    /**
+     * 确保模型齐备：缺什么下什么（断点续传）。
+     * 「清除应用数据」把模型删掉后，这是唯一能把 1.4GB 资产找回来的途径。
+     *
+     * @param onProgress 进度回调（下载字节 / 总字节）
+     * @return true = 全部就绪
+     */
+    suspend fun ensureAssets(
+        onProgress: (done: Long, total: Long) -> Unit = { _, _ -> }
+    ): Boolean {
+        // 先把老目录里的模型搬过来 —— 用户已经下过的 1.4GB 不该再下一遍
+        val moved = modelStore.migrateFromLegacy()
+        if (moved > 0) Log.i(TAG, "migrated $moved bytes of models to durable storage")
+
+        var allOk = true
+        for (spec in modelStore.specs) {
+            val state = modelStore.stateOf(spec)
+            if (state.ok) continue
+            Log.w(TAG, "model not ready: ${state.problem()}")
+            val ok = modelStore.download(spec) { done, total -> onProgress(done, total) }
+            if (!ok) {
+                allOk = false
+                Log.e(TAG, "model download failed: ${spec.fileName}")
+            }
+        }
+        return allOk && assetsReady()
     }
 
     /**
@@ -138,6 +200,42 @@ class LocalLlmServerManager private constructor(private val app: Application) {
         killHandler?.removeCallbacksAndMessages(null)
         killHandler?.postDelayed({ if (!sessionActive && activitiesStarted == 0) stop() }, KILL_BG_DELAY_MS)
     }
+
+    // ------------------------------------------------------------------
+    // 对外健康状态（供自修复工具体检用）
+    // ------------------------------------------------------------------
+
+    /** ASR 服务是否健康（/health 返 200） */
+    fun isAsrHealthy(): Boolean = healthy(asrPort)
+
+    /** 翻译服务是否健康 */
+    fun isTransHealthy(): Boolean = healthy(transPort)
+
+    /** 是否希望服务在跑（含正在加载模型的阶段） */
+    fun isRunning(): Boolean = wantRunning
+
+    /** 当前 ASR 端口（供体检展示） */
+    fun asrPort(): Int = asrPort
+
+    /** 当前翻译端口 */
+    fun transPort(): Int = transPort
+
+    /**
+     * 重启两个服务（自修复动作）。
+     * 先杀掉旧进程再拉起 —— 掉线自愈有时会留下"端口被占但进程已死"的僵持状态。
+     */
+    suspend fun restartServices(): Boolean {
+        Log.i(TAG, "restartServices: 手动重启本地服务")
+        stop()
+        Thread.sleep(800)
+        val ok = start(currentAsrUrl, currentTransUrl, blockUntilReady = true)
+        Log.i(TAG, "restartServices: ${if (ok) "成功" else "失败"} - ${statusText()}")
+        return ok
+    }
+
+    /** 记住最近一次 start() 用的 URL，重启时复用 */
+    @Volatile private var currentAsrUrl: String? = null
+    @Volatile private var currentTransUrl: String? = null
 
     /** 释放两个服务（无会话且退到后台时调用） */
     fun stop() {
@@ -187,8 +285,8 @@ class LocalLlmServerManager private constructor(private val app: Application) {
     /** ASR：Qwen3-ASR 多模态（--mmproj 音频编码器）+ GPU 全层 offload */
     private fun asrArgs(): List<String> = listOf(
         binFile.absolutePath,
-        "-m", File(modelDir, ASR_MODEL).absolutePath,
-        "--mmproj", File(modelDir, ASR_MMPROJ).absolutePath,
+        "-m", File(modelDir, modelStore.asrModel.fileName).absolutePath,
+        "--mmproj", File(modelDir, modelStore.asrMmproj.fileName).absolutePath,
         "--host", "127.0.0.1", "--port", asrPort.toString(),
         "-ngl", "99", "-t", "4",
         "--parallel", "1", "-c", "2048", "--temp", "0",
@@ -198,7 +296,7 @@ class LocalLlmServerManager private constructor(private val app: Application) {
     /** 翻译：Qwen3-0.6B 纯文本 */
     private fun transArgs(): List<String> = listOf(
         binFile.absolutePath,
-        "-m", File(modelDir, TRANS_MODEL).absolutePath,
+        "-m", File(modelDir, modelStore.transModel.fileName).absolutePath,
         "--host", "127.0.0.1", "--port", transPort.toString(),
         "-ngl", "99", "-t", "2",
         "--parallel", "1", "-c", "2048",

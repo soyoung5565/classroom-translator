@@ -20,6 +20,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.CloudDone
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material3.Icon
@@ -75,6 +76,7 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     onBack: () -> Unit,
     viewModel: TranslatorViewModel,
+    onNavigateToRepair: () -> Unit = {},
 ) {
     val state by viewModel.state.collectAsState()
     val settings = state.settings
@@ -138,6 +140,37 @@ fun SettingsScreen(
                     }
 
                     Spacer(Modifier.height(0.dp))
+                    // ── 自修复 ─────────────────────────────
+                    // 【2026-11-02】新增：用户要求给软件加"自修复工具"和"恢复初始形态工具"。
+                    GroupHeader(icon = Icons.Outlined.Build, title = "诊断与修复", code = "REPAIR")
+                    ItemCard(name = "自修复工具", desc = "一键体检（本地服务/模型/配置/存储）+ 自动修复 + AI 诊断") {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(36.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(cs.primaryContainer)
+                                .clickable { onNavigateToRepair() },
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Outlined.Build,
+                                contentDescription = null,
+                                tint = cs.onPrimaryContainer,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                "打开自修复工具",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = cs.onPrimaryContainer,
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(0.dp))
                     // ── 云端翻译 ─────────────────────────────
                     GroupHeader(icon = Icons.Outlined.CloudDone, title = "云端大模型", code = "CLOUD")
                     ItemCard(name = "接口地址", desc = "默认火山方舟（OpenAI 兼容），无需修改即可用；也可填 MiniMax /anthropic 等") {
@@ -163,25 +196,20 @@ fun SettingsScreen(
                     Spacer(Modifier.height(0.dp))
                     // ── 大模型翻译 ───────────────────────────
                     GroupHeader(icon = Icons.Outlined.AutoAwesome, title = "大模型翻译", code = "LLM")
-                    ItemCard(name = "模型档位", desc = "整套切换：本地免费离线 / 火山方舟云端（地址与密钥随之更新）") {
-                        SegWrap(
-                            options = ModelPresets.map { it.id to it.label },
-                            selected = presetOf(settings)?.id ?: "",
-                            onSelect = { id ->
-                                ModelPresets.firstOrNull { it.id == id }?.let { preset ->
-                                    viewModel.updateSettings { s ->
-                                        s.copy(
-                                            translateBaseUrl = preset.baseUrl,
-                                            translateModel = preset.model,
-                                            translateApiKey = preset.apiKey,
-                                        )
-                                    }
-                                }
-                            },
-                            perRow = 2,
+                    // 【2026-11-02】删除了原来的「模型档位」分段按钮（本地 Qwen3 / 火山 DeepSeek 手切）。
+                    // 用户反馈：「软件本身是翻译双引擎吗，先本地后云端，就不应该有这个可以切的按钮，而且切换有问题」。
+                    // 双引擎是**自动链路**：本地先出快译文 → 云端后到直接覆盖，不需要用户手切。
+                    // 手切还带来真 bug：改任何一项设置时 update() 曾把 asrMode 悄悄写成 "dashscope"，
+                    // 导致下次录音走云端 ASR → 401 Unauthorized（Expected HTTP 101 response）。
+                    ItemCard(name = "工作方式", desc = "本地引擎先出译文，云端大模型随后自动覆盖，无需手动切换") {
+                        Text(
+                            "自动双引擎 · 本地优先 → 云端覆盖",
+                            fontSize = 12.sp,
+                            color = cs.primary,
+                            fontWeight = FontWeight.Medium,
                         )
                     }
-                    ItemCard(name = "接口地址", desc = "兼容 OpenAI 协议的接口地址") {
+                    ItemCard(name = "接口地址", desc = "兼容 OpenAI 协议的接口地址（本地引擎默认 127.0.0.1:8002）") {
                         FieldBox(
                             value = settings.translateBaseUrl,
                             onChange = { v -> viewModel.updateSettings { s -> s.copy(translateBaseUrl = v) } },
@@ -206,38 +234,6 @@ private val LangOptions = listOf(
     "ms" to "马来语",
     "auto" to "自动",
 )
-
-/**
- * 模型档位 = 整套预设（接口地址 + 模型 + 密钥一起切换）——2026-09-26 修复：
- * 此前只改 translateModel 单个字段，而本地端点会忽略模型名 → 单点切换等于假控件；
- * 且原 5 个选项里 kimi/glm/qwen 等并无手机可达的接口。现只保留两条已实测通路。
- */
-private data class ModelPreset(
-    val id: String,
-    val label: String,
-    val baseUrl: String,
-    val model: String,
-    val apiKey: String,
-)
-
-private val ModelPresets = listOf(
-    ModelPreset("local", "本地 Qwen3", "http://127.0.0.1:8002/v1", "qwen3", ""),
-    ModelPreset(
-        "volc", "火山 DeepSeek",
-        com.classroom.translator.BuildConfig.VOLC_BASE_URL,
-        com.classroom.translator.BuildConfig.VOLC_MODEL,
-        com.classroom.translator.BuildConfig.VOLC_API_KEY,
-    ),
-)
-
-private fun presetOf(settings: com.classroom.translator.data.AppSettings): ModelPreset? {
-    val url = settings.translateBaseUrl.trimEnd('/')
-    return ModelPresets.firstOrNull { p ->
-        val sameUrl = p.baseUrl.trimEnd('/') == url
-        val sameModel = if (p.id == "local") settings.translateModel.startsWith("qwen3") else settings.translateModel == p.model
-        sameUrl && sameModel
-    }
-}
 
 // ---------------------------------------------------------------------------
 
@@ -327,27 +323,6 @@ private fun SegRow(
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
         options.forEach { (id, label) ->
             SegChip(label = label, selected = id == selected, onClick = { onSelect(id) }, modifier = Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-private fun SegWrap(
-    options: List<Pair<String, String>>,
-    selected: String,
-    onSelect: (String) -> Unit,
-    perRow: Int,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        options.chunked(perRow).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                row.forEach { (id, label) ->
-                    SegChip(label = label, selected = id == selected, onClick = { onSelect(id) }, modifier = Modifier.weight(1f))
-                }
-                repeat(perRow - row.size) {
-                    Spacer(Modifier.weight(1f))
-                }
-            }
         }
     }
 }
