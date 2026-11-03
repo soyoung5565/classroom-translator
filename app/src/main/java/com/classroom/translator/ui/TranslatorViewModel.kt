@@ -506,8 +506,16 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun startLocalVllmStreaming() {
         val settings = _state.value.settings
-        val baseUrl = settings.asrBaseUrl.trimEnd('/')
-        Log.i(TAG, "Starting local vLLM streaming ASR @ $baseUrl (model=${settings.asrModel})")
+        /**
+         * 【2026-11-03】用**管理器当前的对外 URL**，不是设置里写死的那个。
+         *
+         * 引擎轮换后对外端口会变（A: 8000/8002 ↔ B: 8100/8102）。
+         * 若这里还用 settings.asrBaseUrl（永远指向 A 的端口），
+         * 一轮换之后请求全打到已经下线的引擎 → 翻译直接停摆。
+         */
+        val mgr = LocalLlmServerManager.get(getApplication())
+        val baseUrl = mgr.currentAsrBaseUrl().trimEnd('/')
+        Log.i(TAG, "Starting local vLLM streaming ASR @ $baseUrl (model=${settings.asrModel}) | ${mgr.rotationInfo()}")
 
         // forceLanguage: "auto"/"en"/"zh" -> String?("English"/"Chinese"/null)
         val langArg: String? = when (settings.asrLanguage) {
@@ -517,7 +525,10 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         }
         Log.i(TAG, "ASR language arg: ${langArg ?: "auto"}")
         localVllmStream = LocalVllmAsrStream(
-            baseUrl = baseUrl,
+            ctx = getApplication(),
+            // 【2026-11-03】每次请求都问管理器要当前对外 URL —— 引擎轮换后端口会变，
+            // 固定 URL 会导致轮换之后请求全打到已下线的引擎。
+            baseUrlProvider = { mgr.currentAsrBaseUrl() },
             model = settings.asrModel,
             forceLanguage = langArg,
             inputAudioFormat = true,   // 本地后端是 llama-server，只认 input_audio（audio_url 会 400）
@@ -526,15 +537,41 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 Log.i(TAG, "vLLM result: $text (final=$isFinal)")
                 if (isFinal) {
                     viewModelScope.launch(Dispatchers.Default) {
+                        val mgr = LocalLlmServerManager.get(getApplication())
                         val chinese = try {
-                            api.translate(
-                                baseUrl = settings.translateBaseUrl,
+                            val r = api.translate(
+                                baseUrl = mgr.currentTransBaseUrl(),
                                 apiKey = settings.translateApiKey,
                                 model = settings.translateModel,
                                 text = text
                             )
-                        } catch (e: Exception) { "[翻译失败: ${e.message}]" }
-                        addOrMergeEntry(text, chinese)
+                            mgr.reportTransSuccess()
+                            r
+                        } catch (e: Exception) {
+                            // 【2026-11-03】连续失败 3 次 → 判定引擎挂死 → 强制重启
+                            mgr.reportTransFailure()
+                            "[翻译失败: ${e.message}]"
+                        }
+                        /**
+                         * 【2026-11-03】跨硬切段时，**中文也要合并**，不能只替换。
+                         *
+                         * 情况：上一条 = "好的，我会回复你。站起来。"（前半段翻的）
+                         *      本次   = "好的，我会回复你。站起来。什么是"（合并后的完整英文）
+                         * 本次的译文只覆盖了后半句（"什么是"）→ 直接替换会把
+                         * 前半句的中文弄丢，界面上中文变成"什么是"（比英文还短）。
+                         *
+                         * 判据：本次英文是否以上一条英文开头（= 同一句的续写/合并）。
+                         * 是 → 中文也按同样的方式合并（上一条中文 + 本次译文去掉重复前缀）。
+                         */
+                        val prev = _state.value.entries.lastOrNull()
+                        val mergedChinese = if (
+                            prev != null &&
+                            prev.english.trim().length >= 12 &&
+                            text.startsWith(prev.english.trim())
+                        ) {
+                            mergeChinese(prev.chinese, chinese)
+                        } else chinese
+                        addOrMergeEntry(text, mergedChinese)
                         maybeCloudOverride()  // 双翻译：每 3 条云端覆盖
                     }
                 }
@@ -914,7 +951,8 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
         var done = 0
         for (chunk in entries.indices.chunked(20)) {
             val segs = chunk.map { entries[it].english }
-            val pairs = try {
+            // 【2026-11-03】云端只回中文；英文保留 ASR 原始识别结果（事实来源）。
+            val zhList = try {
                 api.cloudBatchTranslate(
                     baseUrl = settings.cloudBaseUrl,
                     apiKey = settings.cloudApiKey,
@@ -927,21 +965,13 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
             }
             chunk.forEachIndexed { j, idx ->
                 val e = entries[idx]
-                val pr = pairs?.getOrNull(j)
-                if (pr != null && pr.first != "[解析失败]" && pr.first != "[无翻译]" && pr.second != "[解析失败]" && pr.second != "[无翻译]") {
-                    val newEn = pr.first.trim()
-                    val newZh = pr.second.trim()
+                val newZh = zhList?.getOrNull(j)?.trim().orEmpty()
+                if (newZh.isNotEmpty()) {
                     // 润色前原文留档（详情页「（原：…）」对比）：仅在本轮确有变化且尚未留档时记录，
                     // 多次润色保留最早的"润色前"版本。
                     out.add(
                         e.copy(
-                            english = newEn,
                             chinese = newZh,
-                            origEnglish = when {
-                                newEn == e.english.trim() -> e.origEnglish
-                                e.origEnglish.isNotBlank() -> e.origEnglish
-                                else -> e.english
-                            },
                             origChinese = when {
                                 newZh == e.chinese.trim() -> e.origChinese
                                 e.origChinese.isNotBlank() -> e.origChinese
@@ -1098,7 +1128,15 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 _state.value = _state.value.copy(status = "云端复盘中...")
                 val recent = currentEntries.takeLast(5)
                 val segments = recent.map { it.english }
-                // Cloud path: M3 via Anthropic protocol (REPLACES local, not "corrects")
+
+                // 【2026-11-03 修复 1：锚定条目，不再靠 size 算下标】
+                // 原写法 `idx = updated.size - recent.size + i`：云端请求要 ~2 秒，
+                // 这 2 秒里新的识别条目不断进来 → updated.size 变大 → 下标整体偏移
+                // → **译文贴到了别的句子上**（界面上就是"某句的翻译变成了另一句的"）。
+                // 现在在发请求**之前**把每段的条目 id 记下来，回来后按 id 精确回填。
+                val anchors = recent.map { it.id }
+
+                // Cloud path: 只回中文（【2026-11-03】英文由 ASR 提供，云端不许复述）
                 val corrections = api.cloudBatchTranslate(
                     baseUrl = settings.cloudBaseUrl,
                     apiKey = settings.cloudApiKey,
@@ -1109,14 +1147,16 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 var corrected = false
                 val updated = _state.value.entries.toMutableList()
                 for (i in corrections.indices) {
-                    val idx = updated.size - recent.size + i
-                    if (idx >= 0 && idx < updated.size) {
-                        val (newEn, newZh) = corrections[i]
-                        if (newEn != "[解析失败]" && newEn != "[无翻译]" && newZh != "[解析失败]" && newZh != "[无翻译]" && (newEn != updated[idx].english || newZh != updated[idx].chinese)) {
-                            updated[idx] = updated[idx].copy(english = newEn, chinese = newZh, isCorrected = true)
-                            corrected = true
-                            Log.i(TAG, "Override #$idx: ${updated[idx].english.take(30)} -> ${newEn.take(30)}")
-                        }
+                    val newZh = corrections[i].trim()
+                    if (newZh.isEmpty()) continue
+                    // 按 id 找到这条（而不是按下标）—— 新条目插进来也不会错位
+                    val idx = updated.indexOfFirst { it.id == anchors[i] }
+                    if (idx < 0) continue
+                    // 只替换中文，英文保持 ASR 的原始识别结果
+                    if (newZh != updated[idx].chinese) {
+                        updated[idx] = updated[idx].copy(chinese = newZh, isCorrected = true)
+                        corrected = true
+                        Log.i(TAG, "Override #$idx: ${updated[idx].chinese.take(30)} -> ${newZh.take(30)}")
                     }
                 }
                 if (corrected) {
@@ -1176,6 +1216,20 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
     private fun offsetNow(): Int =
         if (recStartMs > 0) ((System.currentTimeMillis() - recStartMs) / 1000).toInt() else -1
 
+    /**
+     * 加条目（带去重/续写合并）：
+     * - 与上一条完全相同 → 丢弃（模型重复输出）
+     * - 上一条是新条前缀（同句续写）→ 原地升级，避免重复条目
+     * - **上一条是新条的一部分（硬切段合并）** → 原地升级
+     *
+     * 【2026-11-03】新增第三种：ASR 侧把被 8 秒硬上限切开的句子合并后送进来，
+     * 新文本**同时包含**旧文本（不是以旧文本开头，而是旧文本是它的前缀的一部分）。
+     * 例如旧 = "Okay, I will get back to you. Stand up."，新 = "Okay, I will get back to you. Stand up. What is this"
+     * —— 旧是新开头 → 已能被第 2 条覆盖。
+     * 但当合并发生在**词中间**（旧="I will get back to"，新="I will get back to you."），
+     * 旧不是新开头的完整前缀时也要能识别出来。
+     * 判据：新文本以旧文本开头 **或** 旧文本以新文本开头（新的更短 = 模型截断了，退回旧的）。
+     */
     internal fun addOrMergeEntry(text: String, chinese: String, timestamp: String? = null) {
         val entries = _state.value.entries
         val last = entries.lastOrNull()
@@ -1190,6 +1244,10 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 )
                 Log.i(TAG, "merge continuation: ${t.take(40)}")
             }
+            last != null && last.english.trim().length >= 12 && last.english.trim().startsWith(t) -> {
+                // 云端/模型把句子截短了 —— 保留更长的旧文本，别让完整句子被短的覆盖
+                Log.i(TAG, "keep longer previous entry: ${last.english.take(40)}")
+            }
             else -> {
                 val entry = if (timestamp != null) TranslationEntry(english = text, chinese = chinese, timestamp = timestamp, startSec = offsetNow())
                 else TranslationEntry(english = text, chinese = chinese, startSec = offsetNow())
@@ -1197,6 +1255,31 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                 autoSave(entry)
             }
         }
+    }
+
+    /**
+     * 合并中文译文（对应英文的跨硬切段合并）。
+     *
+     * 与 [TranscriptMerger.merge] 同理：**结果必须以 prev 开头**，
+     * 否则上层 addOrMergeEntry 会当成新句子。
+     * 中文没有空格分词，所以按「公共前后缀」判断重复：
+     * 若 prev 的结尾与 next 的开头有重叠（按字符），去掉 next 的重叠前缀。
+     */
+    private fun mergeChinese(prev: String, next: String): String {
+        val a = prev.trim()
+        val b = next.trim()
+        if (a.isEmpty()) return b
+        if (b.isEmpty()) return a
+        // next 已经是完整译文（模型翻的是合并后的整句）→ 直接用它
+        // 但要保证它包含 prev 的语义：若 next 明显比 prev 短且不以 prev 开头，
+        // 说明本次只翻了后半句 → 拼起来。
+        if (b.length >= a.length) return b
+        // next 更短 → 可能是只翻了后半句，拼到 prev 后面
+        val maxChars = minOf(a.length, b.length, 12)
+        for (n in maxChars downTo 1) {
+            if (a.endsWith(b.take(n))) return a + b.drop(n)
+        }
+        return "$a $b"
     }
 
     private fun autoSave(entry: TranslationEntry) {

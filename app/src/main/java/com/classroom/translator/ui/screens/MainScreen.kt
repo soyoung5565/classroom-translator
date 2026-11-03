@@ -61,6 +61,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
@@ -114,6 +115,24 @@ fun MainScreen(
 
     // Session timer (display-only; VM keeps no duration field).
     var elapsedSec by remember { mutableStateOf(0L) }
+
+    /**
+     * 【2026-11-03】引擎轮换状态（给用户看）。
+     * 用户要求「定时重启 / 双引擎并发」—— 必须让他看见确实在轮换，
+     * 否则用户只会觉得"App 偶尔卡一下"。
+     */
+    var engineInfo by remember { mutableStateOf("") }
+    // ⚠️ LocalContext.current 只能在 @Composable 上下文取 —— 必须提到 LaunchedEffect 外面
+    val appContext = LocalContext.current.applicationContext as? android.app.Application
+    LaunchedEffect(state.isRecording, appContext) {
+        if (!state.isRecording) { engineInfo = ""; return@LaunchedEffect }
+        while (state.isRecording) {
+            engineInfo = if (appContext != null) {
+                com.classroom.translator.local.LocalLlmServerManager.get(appContext).rotationInfo()
+            } else ""
+            delay(3000)
+        }
+    }
     LaunchedEffect(state.isRecording) {
         if (state.isRecording) {
             val base = System.currentTimeMillis() - elapsedSec * 1000L
@@ -215,6 +234,7 @@ fun MainScreen(
                 isProcessing = state.isProcessing,
                 count = state.entries.size,
                 elapsedSec = elapsedSec,
+                engineInfo = engineInfo,
                 onToggle = { viewModel.toggleRecording() },
                 onFinish = {
                     viewModel.finishSession()
@@ -449,7 +469,8 @@ private fun TranslationCard(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("删除此条目？") },
-            text = { Text(entry.chinese.take(50) + "…") },
+            // 【2026-11-03】完整显示，不再截断
+            text = { Text(entry.chinese) },
             confirmButton = {
                 TextButton(onClick = { showDeleteDialog = false; onDelete() }) {
                     Text("删除", color = cs.error)
@@ -494,6 +515,16 @@ private fun TranslationCard(
                 color = cs.onSurface,
             )
             Spacer(Modifier.height(5.dp))
+            /**
+             * 【2026-11-03 修复：英文完整显示，不再截断】
+             *
+             * 用户反馈「识别结果没有显示完整」：卡片上英文只显示一行 / 两行，
+             * 后面的内容变成 "…" 被吃掉。课堂翻译的英文是**老师说的话**，
+             * 是用户上课时唯一能对照的原文 —— 截断等于把课听丢了。
+             *
+             * 现在英文不限行数、完整显示（中文本来就不限行）。
+             * 视觉上多占空间是应该的代价：内容完整 > 卡片紧凑。
+             */
             if (isLatest) {
                 Text(
                     entry.english,
@@ -502,8 +533,6 @@ private fun TranslationCard(
                         fontSize = 14.sp,
                         lineHeight = 20.sp,
                     ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
                 )
                 if (isRecording) {
                     Spacer(Modifier.height(8.dp))
@@ -514,8 +543,6 @@ private fun TranslationCard(
                     entry.english,
                     style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
                     color = cs.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -587,6 +614,7 @@ private fun DockOverlay(
     isProcessing: Boolean,
     count: Int,
     elapsedSec: Long,
+    engineInfo: String = "",
     onToggle: () -> Unit,
     onFinish: () -> Unit,
 ) {
@@ -619,7 +647,7 @@ private fun DockOverlay(
             }
         }
         if (count > 0 || isRecording) {
-            StatsBar(count = count, elapsedSec = elapsedSec)
+            StatsBar(count = count, elapsedSec = elapsedSec, engineInfo = engineInfo)
         }
     }
 }
@@ -709,28 +737,46 @@ private fun FinishPill(onClick: () -> Unit) {
 }
 
 @Composable
-private fun StatsBar(count: Int, elapsedSec: Long) {
+private fun StatsBar(count: Int, elapsedSec: Long, engineInfo: String = "") {
     val cs = MaterialTheme.colorScheme
     val tk = AppTheme.tokens
     val st = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum", letterSpacing = 0.36.sp)
     val shape = RoundedCornerShape(50)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(30.dp)
-            .clip(shape)
-            .background(cs.surfaceContainer.copy(alpha = 0.88f))
-            .border(1.dp, tk.hairline, shape),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Text("已翻译", style = st, color = cs.onSurfaceVariant)
-        Spacer(Modifier.width(4.dp))
-        Text("$count", style = st.copy(fontWeight = FontWeight.SemiBold), color = cs.onSurface)
-        Spacer(Modifier.width(4.dp))
-        Text("句 ·", style = st, color = cs.onSurfaceVariant)
-        Spacer(Modifier.width(4.dp))
-        Text(fmtDuration(elapsedSec), style = st.copy(fontWeight = FontWeight.SemiBold), color = cs.onSurface)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(30.dp)
+                .clip(shape)
+                .background(cs.surfaceContainer.copy(alpha = 0.88f))
+                .border(1.dp, tk.hairline, shape),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("已翻译", style = st, color = cs.onSurfaceVariant)
+            Spacer(Modifier.width(4.dp))
+            Text("$count", style = st.copy(fontWeight = FontWeight.SemiBold), color = cs.onSurface)
+            Spacer(Modifier.width(4.dp))
+            Text("句 ·", style = st, color = cs.onSurfaceVariant)
+            Spacer(Modifier.width(4.dp))
+            Text(fmtDuration(elapsedSec), style = st.copy(fontWeight = FontWeight.SemiBold), color = cs.onSurface)
+        }
+        // 【2026-11-03】引擎轮换指示：让用户看见"引擎在按计划换新"，
+        // 而不是只看到一个卡顿的 App。
+        if (engineInfo.isNotBlank()) {
+            Spacer(Modifier.height(5.dp))
+            Text(
+                engineInfo,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 10.sp,
+                    letterSpacing = 0.2.sp,
+                ),
+                color = cs.onSurfaceVariant.copy(alpha = 0.72f),
+            )
+        }
     }
 }
 

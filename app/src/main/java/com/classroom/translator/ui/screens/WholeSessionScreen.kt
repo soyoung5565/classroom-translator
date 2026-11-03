@@ -191,12 +191,14 @@ fun WholeSessionScreen(
                                 color = cs.onSurface,
                             )
                             Spacer(Modifier.height(4.dp))
+                            /**
+                             * 【2026-11-03】完整显示，不截断。
+                             * 整课视图是用户课后回看课堂内容的地方 —— 截断等于内容丢失。
+                             */
                             Text(
                                 entry.chinese,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = cs.onSurfaceVariant,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }

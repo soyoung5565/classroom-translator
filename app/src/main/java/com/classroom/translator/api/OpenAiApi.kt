@@ -307,34 +307,57 @@ class OpenAiApi {
 
     /**
      * 云端批量翻译 —— 严格 1:1（逐条独立翻译，不合并、不丢弃、不重排），协议自适应。
-     * 调用方按位置把第 i 对替换到第 i 条本地译文上（云端覆盖 / 整课重译"润色"）。
-     * 2026-09-26 由 batchTranslateAndMergeCloud 演进：默认云端从 MiniMax(Anthropic)
-     * 切到火山方舟 Agent Plan(OpenAI 兼容) 后，同一函数兼容两种协议。
+     *
+     * 【2026-11-03 重大修正：只返回中文，不再回传英文】
+     *
+     * 用户反馈「识别结果没有显示完整」：卡片上英文和中文都停在半句话，
+     * 例如 英文 "Okay, I will get back to you. Stand up. What is"
+     *       中文 "好的，我会回复你。站起来。什么是"
+     * 两边断在同一个位置 —— 因为原实现让云端**同时回传英文**，
+     * 而云端模型会把自己的"复述版"英文写回去。复述时它会顺手压缩/截断，
+     * 于是英文被云端截短，中文照着被截短的英文翻 → 中英文一起断在半句。
+     *
+     * 修法：云端**只负责中文**。英文原样保留 ASR 的识别结果（那才是老师实际说的话，
+     * 是唯一的事实来源）。中文译文与输入段一一对应，按位置替换。
+     *
+     * @return 与 segments 等长、同序的中文译文列表；解析失败时该位置为 ""。
      */
     suspend fun cloudBatchTranslate(
         baseUrl: String,
         apiKey: String,
         model: String,
         segments: List<String>
-    ): List<Pair<String, String>> {
+    ): List<String> {
         if (segments.isEmpty()) return emptyList()
         val segmentsText = segments.mapIndexed { i, s -> "${i + 1}. $s" }.joinToString("\n")
-        // 严格 1:1: 调用方按位置把第 i 对覆盖到第 i 条本地译文上, 合并/丢弃会错位
+        // 严格 1:1: 调用方按位置把第 i 个译文覆盖到第 i 条本地译文上, 合并/丢弃会错位
         // (2026-09-22 实测: 允许合并时 3 段只回 1 对, 只覆盖 1/3 —— 改为逐条直译)
         val prompt = "You are a professional interpreter. Receive exactly " + segments.size + " numbered ASR segments. " +
             "Translate EACH segment to Chinese independently. " +
-            "Return ONLY a JSON array with EXACTLY " + segments.size + " [english,chinese] pairs, " +
-            "same order and count as the input segments. Do NOT merge, do NOT drop, do NOT reorder."
+            "Return ONLY a JSON array with EXACTLY " + segments.size + " Chinese strings, " +
+            "same order and count as the input segments. Do NOT merge, do NOT drop, do NOT reorder. " +
+            "Translate the FULL text of each segment, including incomplete sentences, do NOT summarize or shorten."
         val content = cloudChat(
             baseUrl = baseUrl, apiKey = apiKey, model = model,
             system = prompt, user = segmentsText,
             maxTokens = maxOf(1500, segments.size * 220), temperature = 0.1
         )
-        return parsePairs(content, segments)
+        return parseChineseList(content, segments.size)
     }
 
-    private fun parsePairs(text0: String, fallback: List<String>): List<Pair<String, String>> {
-        // 剥思考块泄漏 + markdown 代码围栏 (解析失败 6/32 批的常见来源)
+    /**
+     * 解析云端返回的中文数组。
+     *
+     * 兼容三种格式（云端模型不听话是常态）：
+     *   ["中文1","中文2"]                       —— 纯字符串数组
+     *   [{"chinese":"中文1"},{"zh":"中文2"}]    —— 对象数组
+     *   [["英文1","中文1"],["英文2","中文2"]]   —— 旧版的二元组格式
+     *
+     * ⚠️ 用 JSONTokener 验证"消费完整串"——org.json 的 JSONObject 构造器会静默忽略
+     * 后面的垃圾，会把"示例对象"当成结果（课堂总结已踩过这个坑）。
+     */
+    private fun parseChineseList(text0: String, expected: Int): List<String> {
+        // 剥思考块泄漏 + markdown 代码围栏
         val text = text0.replace(Regex("(?s).*?</think>"), "").replace(Regex("```(?:json)?"), "")
         return try {
             val jsonStr = text.let {
@@ -342,26 +365,29 @@ class OpenAiApi {
                 val end = it.lastIndexOf(']')
                 if (start >= 0 && end > start) it.substring(start, end + 1) else it
             }
-            val arr = org.json.JSONArray(jsonStr)
-            val results = mutableListOf<Pair<String, String>>()
-            for (i in 0 until arr.length()) {
-                // 兼容 ["en","zh"] 数组和 {"english":"...","chinese":"..."} 对象两种格式
-                val pair = arr.optJSONArray(i)
-                if (pair != null && pair.length() >= 2) {
-                    results.add(Pair(pair.getString(0), pair.getString(1)))
-                } else {
+            val tokener = org.json.JSONTokener(jsonStr)
+            val arr = tokener.nextValue() as? org.json.JSONArray
+            val results = mutableListOf<String>()
+            if (arr != null) {
+                for (i in 0 until arr.length()) {
+                    val pair = arr.optJSONArray(i)
                     val obj = arr.optJSONObject(i)
-                    if (obj != null) {
-                        val en = obj.optString("english").ifEmpty { obj.optString("en") }
-                        val zh = obj.optString("chinese").ifEmpty { obj.optString("zh") }
-                        if (en.isNotBlank() && zh.isNotBlank()) results.add(Pair(en, zh))
+                    val zh = when {
+                        pair != null && pair.length() >= 2 -> pair.optString(1)
+                        obj != null -> obj.optString("chinese").ifEmpty { obj.optString("zh") }
+                        else -> arr.optString(i)
                     }
+                    results.add(zh)
                 }
             }
-            results.ifEmpty { fallback.map { Pair(it, "[无翻译]") } }
+            // 数量对不上就补齐/截断 —— 宁可少译一条，也别把译文错位贴到别的句子上
+            while (results.size < expected) results.add("")
+            if (results.size > expected) results.subList(expected, results.size).clear()
+            results
         } catch (e: Exception) {
-            Log.e("OpenAiApi", "Batch parse error: " + e.message + " raw: " + text.take(200))
-            fallback.map { Pair(it, "[解析失败]") }
+            Log.e("OpenAiApi", "Chinese list parse error: " + e.message + " raw: " + text.take(200))
+            List(expected) { "" }
         }
     }
+
 }
