@@ -342,7 +342,14 @@ class LocalVllmAsrStream(
                 .post(payload.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
-            val resp = client.newCall(req).execute()
+            // 【2026-11-03】标记在途请求 → 引擎轮换接管时会等它跑完，不丢句子
+            val mgr = appCtx?.let { com.classroom.translator.local.LocalLlmServerManager.get(it) }
+            mgr?.enterAsr()
+            val resp = try {
+                client.newCall(req).execute()
+            } finally {
+                mgr?.exitAsr()
+            }
             val body = resp.body?.string() ?: ""
             if (!resp.isSuccessful) {
                 Log.e(TAG, "vLLM error ${resp.code}: ${body.take(300)}")

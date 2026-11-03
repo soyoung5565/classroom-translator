@@ -65,6 +65,8 @@ class LocalLlmServerManager private constructor(private val app: Application) {
         private const val FAILURE_THRESHOLD = 3
         /** 单个日志文件上限（超过就删掉重开，防止磁盘被 llama-server 日志撑爆） */
         private const val MAX_LOG_BYTES = 4L * 1024 * 1024
+        /** 【2026-11-03】轮换接管时，等待在途请求跑完的最长时间 */
+        private const val DRAIN_MAX_MS = 10_000L
 
         @Volatile private var instance: LocalLlmServerManager? = null
         fun get(app: Application): LocalLlmServerManager =
@@ -101,6 +103,15 @@ class LocalLlmServerManager private constructor(private val app: Application) {
     /** 【2026-11-03】挂死检测：连续失败计数（/health 只探端口，探不出「进程活着但推理卡死」） */
     private val asrFailures = AtomicInteger(0)
     private val transFailures = AtomicInteger(0)
+
+    /**
+     * 【2026-11-03】在途请求计数 —— 轮换接管时必须等它们跑完。
+     *
+     * 否则：接管瞬间正好有一个 ASR 请求在跑 → 旧引擎被 kill → 那一句直接失败 →
+     * 用户上课时看到"某句话突然没了"。课堂场景下一句都不能丢。
+     */
+    private val asrInFlight = AtomicInteger(0)
+    private val transInFlight = AtomicInteger(0)
 
     /** 轮换时序（真相源在 EngineRotationPolicy.Timers —— 测试直接用它） */
     private val timers = EngineRotationPolicy.Timers()
@@ -371,6 +382,21 @@ class LocalLlmServerManager private constructor(private val app: Application) {
     // 【2026-11-03】挂死检测：/health 只探端口，探不出「进程活着但推理卡死」
     // ------------------------------------------------------------------
 
+    /** 【2026-11-03】ASR 请求进入（在途计数 +1） */
+    fun enterAsr() { asrInFlight.incrementAndGet() }
+
+    /** 【2026-11-03】ASR 请求结束（在途计数 -1） */
+    fun exitAsr() { asrInFlight.decrementAndGet() }
+
+    /** 【2026-11-03】翻译请求进入（在途计数 +1） */
+    fun enterTrans() { transInFlight.incrementAndGet() }
+
+    /** 【2026-11-03】翻译请求结束（在途计数 -1） */
+    fun exitTrans() { transInFlight.decrementAndGet() }
+
+    /** 当前在途请求数（ASR + 翻译） */
+    fun inFlight(): Int = asrInFlight.get() + transInFlight.get()
+
     /** ASR 请求成功 */
     fun reportAsrSuccess() { asrFailures.set(0) }
 
@@ -586,9 +612,23 @@ class LocalLlmServerManager private constructor(private val app: Application) {
         standbyPreparing = false
         val now = System.currentTimeMillis()
         timers.beginRound(now)
-        // 让在途请求跑完再杀旧的（否则那一句会失败）
+        /**
+         * 让在途请求跑完再杀旧的。
+         *
+         * 【2026-11-03 改进】原来是「固定等 2.5 秒」—— 但 ASR 单句可能要 3~10 秒
+         * （长课末段更慢），2.5 秒不够 → 接管瞬间那个请求被 kill → **那句话直接丢了**。
+         *
+         * 现在改成「等在途请求归零，最多等 DRAIN_MAX_MS」：
+         *   - 正常情况：几十毫秒就归零 → 几乎无感
+         *   - 请求卡住：最多等 10 秒，超时也照常杀（不能为了等一个请求永远不换引擎）
+         */
         Thread {
-            try { Thread.sleep(2500) } catch (e: InterruptedException) {}
+            val deadline = System.currentTimeMillis() + DRAIN_MAX_MS
+            while (inFlight() > 0 && System.currentTimeMillis() < deadline) {
+                try { Thread.sleep(200) } catch (e: InterruptedException) { break }
+            }
+            val left = inFlight()
+            if (left > 0) Log.w(TAG, "轮换：仍有 $left 个在途请求，杀掉旧引擎")
             killSlotProcesses(old)
             Log.i(TAG, "轮换完成：${active()?.name} 服务中 | ${rotationInfo()}")
         }.also { it.isDaemon = true; it.start() }

@@ -539,12 +539,18 @@ class TranslatorViewModel(app: Application) : AndroidViewModel(app) {
                     viewModelScope.launch(Dispatchers.Default) {
                         val mgr = LocalLlmServerManager.get(getApplication())
                         val chinese = try {
-                            val r = api.translate(
-                                baseUrl = mgr.currentTransBaseUrl(),
-                                apiKey = settings.translateApiKey,
-                                model = settings.translateModel,
-                                text = text
-                            )
+                            // 【2026-11-03】标记在途 → 引擎轮换接管时等它跑完，不丢句子
+                            mgr.enterTrans()
+                            val r = try {
+                                api.translate(
+                                    baseUrl = mgr.currentTransBaseUrl(),
+                                    apiKey = settings.translateApiKey,
+                                    model = settings.translateModel,
+                                    text = text
+                                )
+                            } finally {
+                                mgr.exitTrans()
+                            }
                             mgr.reportTransSuccess()
                             r
                         } catch (e: Exception) {
